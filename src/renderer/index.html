@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="theme-color" content="#22c55e" />
+    <meta
+      name="description"
+      content="Poems是一款专注本地诗歌管理、播放与歌词展示的桌面音乐播放器。"
+    />
+    <title>Poems</title>
+    <style>
+      :root {
+        --animate-delay: 0.5s;
+      }
+
+      #hymn-startup:not([hidden]) {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: grid;
+        place-items: center;
+        background: #f8faf9;
+        pointer-events: none;
+      }
+
+      #hymn-startup[data-theme='dark'] {
+        background: #101512;
+      }
+
+      #hymn-startup img {
+        width: clamp(72px, 10vw, 108px);
+        height: auto;
+        animation: hymn-mark-arrive 440ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+      }
+
+      @keyframes hymn-mark-arrive {
+        from {
+          opacity: 0.6;
+          transform: translateY(5px) scale(0.94);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #hymn-startup img {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hymn-startup" hidden aria-hidden="true">
+      <img src="/icon.png" alt="" width="108" height="108" fetchpriority="high" />
+    </div>
+    <script>
+      const startup = document.getElementById('hymn-startup');
+      if (
+        window.electron &&
+        navigator.userAgent.includes('Windows') &&
+        !/^#\/(lyric|mini)(?:[/?#]|$)/.test(location.hash)
+      ) {
+        startup.dataset.theme =
+          localStorage.getItem('theme') ||
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        startup.hidden = false;
+      } else {
+        startup.remove();
+      }
+    </script>
+    <div id="app"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
