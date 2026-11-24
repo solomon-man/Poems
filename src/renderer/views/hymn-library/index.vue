@@ -10,9 +10,15 @@
             </p>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-2">
+            <n-button secondary :loading="readingScore" @click="readScore">识别蓝版 / 白版 PDF</n-button>
+            <n-button type="primary" secondary @click="piano?.open()">司琴歌单</n-button>
             <n-button v-if="isElectron" secondary @click="workshop?.open()"
               >聚会歌单与备份</n-button
             >
+            <n-button @click="showTools=!showTools" :aria-expanded="showTools">资料工具</n-button>
+          </div>
+        </div>
+        <div v-if="showTools" class="mt-4 flex flex-wrap gap-2 rounded-lg border p-3"><div class="flex flex-wrap gap-2">
             <n-button v-if="isElectron" secondary @click="localAiDialog?.open()">
               <template #icon><i class="ri-chat-3-line" /></template>
               本地 AI
@@ -45,7 +51,8 @@
             </n-button>
           </div>
         </div>
-        <div class="mt-5 flex items-center gap-3">
+        <div class="mt-5 flex flex-wrap items-center gap-3">
+          <n-input v-model:value="authorFilter" clearable placeholder="按词曲作者筛选" class="max-w-xs" />
           <n-input
             v-model:value="searchKeyword"
             class="max-w-md"
@@ -135,7 +142,7 @@
               class="min-w-0 truncate text-left text-sm text-neutral-400"
               @click="openDocument(document)"
             >
-              {{ document.relativePath
+              <small v-if="author(document)" class="block">{{author(document)}}</small>{{ document.source==='custom' ? document.title : document.relativePath
               }}<small v-if="hits[document.id]" class="block truncate text-primary">{{
                 hits[document.id]
               }}</small>
@@ -149,6 +156,7 @@
               {{ document.audioFileName || '尚未匹配' }}
             </span>
             <div class="flex items-center justify-end gap-1" @dblclick.stop>
+              <button class="shrink-0 text-sm" title="司琴谱与署名" @click="piano?.open(document.id)">司琴谱</button>
               <button v-if="isElectron" class="rounded-full px-2 py-1 text-sm hover:bg-rose-100 dark:hover:bg-neutral-800" title="写心迹" @click="journal?.open('hymn:'+document.id, document.title, document.category)"><i class="ri-quill-pen-line"/> 心迹</button>
               <button
                 v-if="isElectron"
@@ -186,6 +194,14 @@
       </div>
     </n-scrollbar>
 
+    <n-modal :show="!!preview" :mask-closable="false" preset="card" title="确认歌谱版别" style="width:min(680px,94vw)">
+      <template v-if="preview"><p>{{preview.name}} · {{preview.scanned?'扫描件 OCR':'PDF 文字层'}}</p>
+      <p>识别结果：{{({blue:'蓝版',white:'白版',unknown:'待确认'})[preview.edition]}} · 和弦：{{preview.chords.join('、')||'未识别'}}</p>
+      <pre class="my-3 max-h-56 overflow-auto whitespace-pre-wrap">{{preview.raw||'未提取到文字，可保留原谱并手动编谱。'}}</pre>
+      <n-radio-group v-model:value="edition"><n-radio value="blue">蓝版歌谱</n-radio><n-radio value="white">白版司琴谱</n-radio></n-radio-group>
+      <div class="mt-4 flex justify-end gap-2"><n-button @click="preview=null">取消</n-button><n-button type="primary" :disabled="!edition" :loading="importBusy" @click="confirmScore">确认导入</n-button></div></template>
+    </n-modal>
+    <piano-book ref="piano" :documents="documents" :lyrics="lyrics" :scores="scores" @change="saveScore" />
     <song-journal ref="journal" />
     <service-workshop
       v-if="isElectron"
@@ -223,6 +239,8 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import type { CustomHymnBook, HymnDocument } from '../../../shared/hymnLibrary';
 import SongJournal from '@/components/player/SongJournal.vue';
+import printedCredits from './credits.json';
+import PianoBook from './PianoBook.vue';
 import ServiceWorkshop from './ServiceWorkshop.vue';
 import baseIndex from './search-index.json';
 import LocalAiDialog from './LocalAiDialog.vue';
@@ -240,6 +258,7 @@ const PREVIEW_COUNTS: Record<string, number> = {
   补充本: 513
 };
 
+const showTools=ref(false);
 const message = useMessage();
 const dialog = useDialog();
 const playerStore = usePlayerStore();
@@ -287,6 +306,16 @@ const categories = computed(() => {
   return [{ name: '全部', count: totalCount.value, custom: false }, ...items];
 });
 
+type Score = {author:string,chart:string};
+type ScorePreview={edition:'blue'|'white'|'unknown',raw:string,author:string,token:string,name:string,scanned:boolean,chords:string[]};
+const preview=ref<ScorePreview|null>(null), edition=ref(''), readingScore=ref(false),importBusy=ref(false);
+async function readScore(){readingScore.value=true;try{preview.value=await window.api.invoke('poems:score-read');edition.value=preview.value?.edition==='unknown'?'':preview.value?.edition||''}catch(e){message.error(String(e))}finally{readingScore.value=false}}
+async function confirmScore(){if(!preview.value||!edition.value||importBusy.value)return;importBusy.value=true;try{const id=await window.api.invoke('poems:score-import',preview.value.token,edition.value);saveScore(id,{author:preview.value.author,chart:preview.value.raw});preview.value=null;await reloadLibrary();selectedCategory.value=edition.value==='white'?'白版 · 司琴谱':'蓝版 · 歌谱';searchKeyword.value='';authorFilter.value='';if(edition.value==='white')piano.value?.open(id);message.success('已保存原谱和识别内容')}catch(e){message.error(String(e))}finally{importBusy.value=false}}
+const piano=ref<InstanceType<typeof PianoBook>|null>(null);
+const scores=ref<Record<string,Score>>(JSON.parse(localStorage.getItem('poems-piano-scores')||'{}'));
+const authorFilter=ref('');
+const author=(d:HymnDocument)=>scores.value[d.id]?.author || d.authors?.join('、') || (printedCredits as Record<string,string>)[d.id] || '';
+function saveScore(id:string,value:Score){scores.value[id]=value;localStorage.setItem('poems-piano-scores',JSON.stringify(scores.value))}
 const journal = ref<InstanceType<typeof SongJournal>|null>(null);
 const workshop = ref<InstanceType<typeof ServiceWorkshop> | null>(null);
 const lyrics = shallowRef<Record<string, string[]>>(baseIndex);
@@ -319,11 +348,12 @@ const searchFields = computed(() =>
 const filteredDocuments = computed(() => {
   const keyword = searchKeyword.value.trim().toLocaleLowerCase('zh-CN');
   const category = selectedCategory.value;
-  if (category === '全部' && !keyword) return documents.value;
+  if (category === '全部' && !keyword && !authorFilter.value.trim()) return documents.value;
 
   return documents.value.filter(
     (document, index) =>
       (category === '全部' || document.category === category) &&
+      author(document).toLocaleLowerCase().includes(authorFilter.value.trim().toLocaleLowerCase()) &&
       (!keyword ||
         hits.value[document.id] ||
         searchFields.value[index].some((field) => field.includes(keyword)))
@@ -489,7 +519,7 @@ onMounted(async () => {
 
 .document-grid {
   display: grid;
-  grid-template-columns: 90px 130px minmax(180px, 1fr) minmax(160px, 0.8fr) 178px;
+  grid-template-columns: 90px 130px minmax(180px, 1fr) minmax(160px, 0.8fr) 222px;
   align-items: center;
   gap: 16px;
 }
@@ -501,7 +531,7 @@ onMounted(async () => {
 
 @media (max-width: 900px) {
   .document-grid {
-    grid-template-columns: 70px minmax(100px, 1fr) 178px;
+    grid-template-columns: 70px minmax(100px, 1fr) 222px;
   }
 
   .document-grid > :nth-child(2),

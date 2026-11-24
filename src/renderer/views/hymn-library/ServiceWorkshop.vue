@@ -232,7 +232,7 @@ function keys(e: KeyboardEvent) {
     else void selectSong(at.value + (e.key === 'ArrowUp' ? -1 : 1));
   }
 }
-const keysToSave = ['poems-services', 'favoriteList', 'favoriteSongDetails'];
+const keysToSave = ['poems-services', 'poems-piano-order', 'poems-piano-scores', 'favoriteList', 'favoriteSongDetails'];
 async function backup() {
   try {
     const data = Object.fromEntries(

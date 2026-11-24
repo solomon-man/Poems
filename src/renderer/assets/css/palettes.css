@@ -1,0 +1,8 @@
+html[data-palette=nord]{--poems-page:#eceff4;--poems-panel:#e5e9f0;--poems-text:#2e3440;--poems-ink:#496888}
+html.dark[data-palette=nord]{--poems-page:#2e3440;--poems-panel:#3b4252;--poems-text:#eceff4;--poems-ink:#88c0d0}
+html[data-palette=latte]{--poems-page:#eff1f5;--poems-panel:#e6e9ef;--poems-text:#4c4f69;--poems-ink:#8839ef}
+html.dark[data-palette=latte]{--poems-page:#1e1e2e;--poems-panel:#313244;--poems-text:#cdd6f4;--poems-ink:#cba6f7}
+html:is([data-palette=nord],[data-palette=latte]) :is(.bg-white,.dark\:bg-black,.app-container){background-color:var(--poems-page)!important;color:var(--poems-text)}
+html:is([data-palette=nord],[data-palette=latte]) :is(.bg-neutral-50,.music-play-bar,.bg-gray-100){background-color:var(--poems-panel)!important}
+html:is([data-palette=nord],[data-palette=latte]) :is(.text-primary,.text-green-500){color:var(--poems-ink)!important}
+html:is([data-palette=nord],[data-palette=latte]) .bg-primary{background-color:var(--poems-ink)!important}

@@ -7,7 +7,7 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 import { registerReflections, validateReflections } from './reflections';
 
 const roots = ['CustomHymnLibrary', 'HymnLyrics', 'SongReflections'];
-const allowedKey = new Set(['poems-services', 'favoriteList', 'favoriteSongDetails']);
+const allowedKey = new Set(['poems-services', 'poems-piano-order', 'poems-piano-scores', 'favoriteList', 'favoriteSongDetails']);
 const uuid = /^[a-f0-9-]{36}$/i;
 const safeName = (s: string) =>
   !!s &&

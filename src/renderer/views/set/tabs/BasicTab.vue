@@ -1,5 +1,8 @@
 <template>
   <setting-section :title="t('settings.sections.basic')">
+    <setting-item title="界面配色" description="配色与明暗模式可分别切换">
+      <template #action><div class="flex flex-wrap gap-2"><button v-for="(p,k) in palettes" :key="k" :aria-pressed="palette===k" class="rounded-full border px-3 py-1" :style="{borderColor:palette===k?p.light:'transparent'}" @click="palette=k"><span :style="{color:p.light}">●</span> {{p.name}}</button></div></template>
+    </setting-item>
     <setting-item
       :title="t('settings.basic.themeMode')"
       :description="t('settings.basic.themeModeDesc')"
@@ -197,6 +200,7 @@ import { computed, h, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 import { getUserDetail } from '@/api/login';
+import {palette,palettes} from '@/utils/palette';
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue';
 import CookieSettingsModal from '@/components/settings/CookieSettingsModal.vue';
 import { useSettingsStore } from '@/store/modules/settings';

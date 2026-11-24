@@ -1,6 +1,6 @@
 import { access, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import type { Canvas } from '@napi-rs/canvas';
 import { getDocument, OPS } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -378,4 +378,137 @@ export async function extractPdfLyrics(
     await worker?.terminate();
     await task.destroy();
   }
+}
+export async function readScorePages(file: string, modelDirectory: string) {
+  const task = getDocument({ data: new Uint8Array(await readFile(file)), useSystemFonts: true });
+  let worker: Tesseract.Worker | undefined;
+  const lines: string[] = [];
+  let scanned = false;
+  try {
+    const pdf = await task.promise;
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      try {
+        const content = await page.getTextContent();
+        const items = content.items
+          .filter((item) => 'str' in item && item.str.trim())
+          .map((item) => {
+            if (!('str' in item)) throw Error('无效文字');
+            return { s: item.str, x: item.transform[4], y: item.transform[5] };
+          })
+          .sort((a, b) => b.y - a.y);
+        const groups: { y: number; items: typeof items }[] = [];
+        for (const item of items) {
+          let row = groups.at(-1);
+          if (!row || Math.abs(item.y - row.y) > 3) {
+            row = { y: item.y, items: [] };
+            groups.push(row);
+          }
+          row.items.push(item);
+        }
+        const text = groups.map((row) =>
+          row.items
+            .sort((a, b) => a.x - b.x)
+            .map((item) => item.s)
+            .join(' ')
+        );
+        const ops = await page.getOperatorList();
+        const image =
+          ops.fnArray.includes(OPS.paintImageXObject) ||
+          ops.fnArray.includes(OPS.paintInlineImageXObject);
+        if (!text.length || (image && text.join('').length < 100)) {
+          scanned = true;
+          worker ??= await openOcr({ modelDirectory });
+          const base = page.getViewport({ scale: 1 }),
+            viewport = page.getViewport({
+              scale: Math.min(3, 2400 / Math.max(base.width, base.height))
+            });
+          const factory = pdf.canvasFactory as CanvasFactory,
+            surface = factory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
+          try {
+            await page.render({ canvas: surface.canvas as unknown as HTMLCanvasElement, viewport })
+              .promise;
+            const data = await recognize(worker, await surface.canvas.encode('png'), false);
+            lines.push(...(data.text.trim() ? data.text.trim().split(/\r?\n/) : text));
+          } finally {
+            factory.destroy(surface);
+          }
+        } else {
+          for (let k = 0; k < groups.length; k++) {
+            const row = groups[k],
+              next = groups[k + 1];
+            const tokens = row.items.flatMap((item) => item.s.trim().split(/\s+/));
+            const chordOnly =
+              tokens.length > 0 &&
+              tokens.every((t) =>
+                /^[A-G][#b♯♭]?(?:maj|min|sus|dim|aug|add|m)?\d*(?:\/[A-G][#b♯♭]?)?$/.test(t)
+              );
+            if (
+              chordOnly &&
+              next &&
+              /[\p{L}]/u.test(text[k + 1]) &&
+              /[\p{Script=Han}a-z]{2}|[\p{Script=Han}]/u.test(text[k + 1]) &&
+              row.items.every((it) => !it.s.trim().includes(' '))
+            ) {
+              const marks = new Map<number, string[]>();
+              for (const item of row.items) {
+                let ix = 0;
+                for (let j = 1; j < next.items.length; j++)
+                  if (Math.abs(next.items[j].x - item.x) < Math.abs(next.items[ix].x - item.x))
+                    ix = j;
+                marks.set(ix, [...(marks.get(ix) ?? []), item.s.trim()]);
+              }
+              lines.push(
+                next.items
+                  .map(
+                    (item, ix) => (marks.get(ix) ?? []).map((c) => '[' + c + ']').join('') + item.s
+                  )
+                  .join(' ')
+              );
+              k++;
+            } else lines.push(text[k]);
+          }
+        }
+      } finally {
+        page.cleanup();
+      }
+    }
+  } finally {
+    await worker?.terminate();
+    await task.destroy();
+  }
+  const normalized = lines.map(line=>line.normalize('NFKC').replace(/(?<=\p{Script=Han})[ \t]+(?=\p{Script=Han})/gu,''));
+  const raw = normalized.join('\n'),
+    tokens = raw.replace(/[|｜\[\]（）()]/g, ' ').split(/\s+/);
+  const chords = tokens.filter((s) =>
+    /^[A-G][#b♯♭]?(?:(?:maj|min|sus|dim|aug|add|m)\d*|[2679])?(?:\/[A-G][#b♯♭]?)?$/.test(s)
+  );
+  const hint = basename(file) + '\n' + raw;
+  const white = /白版|白本/.test(hint) || new Set(chords).size >= 3;
+  const blue =
+    /蓝版|藍版/.test(hint) || /[1-7]\s*[-|]\s*[1-7]/.test(raw) || /[\uE000-\uF8FF]/.test(raw);
+  const explicitWhite = /白版|白本/.test(hint),
+    explicitBlue = /蓝版|藍版/.test(hint);
+  const edition =
+    explicitBlue && explicitWhite
+      ? 'unknown'
+      : explicitBlue && !explicitWhite
+        ? 'blue'
+        : explicitWhite && !explicitBlue
+          ? 'white'
+          : white
+            ? 'white'
+            : blue
+              ? 'blue'
+              : 'unknown';
+  return {
+    raw,
+    edition,
+    scanned,
+    chords: [...new Set(chords)],
+    author: normalized
+      .map((l) => l.match(/^\s*(?:作[词詞曲]|[词詞曲]|作者)\s*[:：]\s*(.{2,80})/u)?.[1])
+      .filter(Boolean)
+      .join('、')
+  };
 }

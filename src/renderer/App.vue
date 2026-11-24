@@ -1,6 +1,6 @@
 <template>
   <div class="app-container h-full w-full" :class="{ mobile: isMobile, noElectron: !isElectron }">
-    <n-config-provider :theme="theme === 'dark' ? darkTheme : lightTheme">
+    <n-config-provider :theme-overrides="paletteOverrides" :theme="theme === 'dark' ? darkTheme : lightTheme">
       <n-dialog-provider>
         <n-message-provider>
           <router-view></router-view>
@@ -30,6 +30,9 @@ import { initLxMusicRunner } from './services/LxMusicSourceRunner';
 import { isMobile } from './utils';
 import { useAppShortcuts } from './utils/appShortcuts';
 
+import {palette,palettes} from './utils/palette';
+import './assets/css/palettes.css';
+const paletteOverrides=computed(()=>{if(palette.value==='classic')return {};const color=palettes[palette.value][theme.value==='dark'?'dark':'light'];return {common:{primaryColor:color,primaryColorHover:color,primaryColorPressed:color}}});
 const { locale } = useI18n();
 const settingsStore = useSettingsStore();
 const playerStore = usePlayerStore();

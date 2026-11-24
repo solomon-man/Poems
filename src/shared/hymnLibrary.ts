@@ -7,6 +7,7 @@ export type HymnDocument = {
   source: 'builtin' | 'custom';
   bookId?: string;
   hasAudio: boolean;
+  authors?: string[];
   audioFileName?: string;
   lyricsReady: boolean;
 };

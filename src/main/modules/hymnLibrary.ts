@@ -7,7 +7,7 @@ import * as mm from 'music-metadata';
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { initializeLyricsRecognition, ocrModelDirectory } from './lyricsRecognition';
 import { buildTimedLyrics, readRecognizedLyrics } from './recognizedLyrics';
-import { extractPdfLyrics } from './pdfLyrics';
+import { extractPdfLyrics, readScorePages } from './pdfLyrics';
 
 import type {
   CustomHymnBook,
@@ -26,6 +26,7 @@ type StoredDocument = {
 };
 
 type AudioLink = {
+  authors?: string[];
   path: string;
   duration: number;
   title: string;
@@ -115,6 +116,7 @@ const buildBuiltinDocuments = async (manifest: HymnManifest): Promise<ResolvedDo
       relativePath,
       source: 'builtin',
       hasAudio: Boolean(audio),
+      authors: audio?.authors,
       audioFileName: audio ? basename(audio.path) : undefined,
       lyricsReady: false,
       filePath
@@ -145,6 +147,7 @@ const buildCustomDocuments = async (manifest: HymnManifest): Promise<ResolvedDoc
         source: 'custom' as const,
         bookId: document.bookId,
         hasAudio: Boolean(audio),
+      authors: audio?.authors,
         audioFileName: audio ? basename(audio.path) : undefined,
         lyricsReady,
         filePath
@@ -234,6 +237,26 @@ const getOrCreateLyrics = async (
 
 export function initializeHymnLibrary(): void {
   registerServiceTools();
+  let pendingScore:{path:string,token:string}|undefined;
+  ipcMain.handle('poems:score-read',async ()=>{
+    const choice=await dialog.showOpenDialog({properties:['openFile'],filters:[{name:'PDF 歌谱',extensions:['pdf']}]});
+    if(choice.canceled)return null;
+    const path=choice.filePaths[0], token=randomUUID();
+    const result=await readScorePages(path,ocrModelDirectory());
+    pendingScore={path,token};
+    return {...result,token,name:basename(path)};
+  });
+  ipcMain.handle('poems:score-import',async (_,token:string,edition:string)=>{
+    if(!pendingScore||token!==pendingScore.token||!['blue','white'].includes(edition))throw Error('请重新预览歌谱');
+    const path=pendingScore.path;
+    const manifest=await readManifest(), name=edition==='blue'?'蓝版 · 歌谱':'白版 · 司琴谱';
+    let book=manifest.books.find(b=>b.name===name);
+    if(!book){book={id:randomUUID(),name,createdAt:Date.now()};manifest.books.push(book)}
+    const folder=join(getCustomRoot(),book.id), id='custom:'+randomUUID(),fileName=id.slice(7)+'.pdf',title=basename(path,extname(path));
+    await fs.mkdir(folder,{recursive:true});await fs.copyFile(path,join(folder,fileName));
+    manifest.documents.push({id,bookId:book.id,title,number:numericKey(title)??title,fileName});
+    await writeManifest(manifest);pendingScore=undefined;return id;
+  });
   const customText = new Map<string, { stamp: number; lines: string[] }>();
   ipcMain.handle('poems:lyrics', async () => {
     const manifest = await readManifest(),
@@ -486,6 +509,7 @@ export function initializeHymnLibrary(): void {
             path: filePath,
             duration: Math.round((metadata.format.duration ?? 0) * 1000),
             title: metadata.common.title || basename(filePath, extname(filePath)),
+            authors: [...new Set([...(metadata.common.lyricist || []), ...(metadata.common.composer || [])])],
             artist: metadata.common.artist || '诗歌本'
           };
           matched += 1;
