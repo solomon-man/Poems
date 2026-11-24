@@ -15,7 +15,7 @@ const assert = require('node:assert/strict'),
     await page.evaluate(() => (location.hash = '/hymn-library'));
     const filter = page.getByPlaceholder('搜作者、歌手、歌名或歌词');
     await filter.fill('宣信');
-    await page.locator('.document-row').first().getByText('宣信').waitFor();
+    await page.locator('.document-row').first().getByText('宣信', { exact: true }).waitFor();
     const file = path.join(tmp, '练习.pdf');
     const bytes = await app.evaluate(async ({ BrowserWindow }) => {
       const w = new BrowserWindow({ show: false });
@@ -47,7 +47,7 @@ const assert = require('node:assert/strict'),
     assert.ok((await page.locator('.score').innerText()).includes('G7'));
     await page.keyboard.press('Escape');
     await filter.fill('示例作者');
-    await page.locator('.document-row').first().getByText('示例作者').waitFor();
+    await page.locator('.document-row').first().getByText('示例作者', { exact: true }).waitFor();
     await page.evaluate(() => (location.hash = '/set'));
     await page.getByRole('button', { name: /Nord 极光/ }).click();
     assert.equal(await page.locator('html').getAttribute('data-palette'), 'nord');

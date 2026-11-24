@@ -4,7 +4,7 @@
 
 **[⬇ 下载 Windows x64 安装包（Poems 0.8.0）](https://github.com/solomon-man/Poems/releases/download/v0.8.0/Poems-0.8.0-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
 
-双击安装程序，选择安装目录，完成后从桌面打开 Poems。
+双击安装程序，选择安装目录，完成后从桌面打开 Poems。0.8.0 的 Windows x64 安装包为 259,865,089 字节，比 0.7.0 缩小 35.3%；解包后的程序文件合计减少 23.8%。
 
 Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、歌谱检索、歌词识别和本地 AI。首次使用可先在本地音乐页选择歌曲文件夹。
 
