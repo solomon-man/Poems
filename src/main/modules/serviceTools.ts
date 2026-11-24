@@ -4,7 +4,9 @@ import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
-const roots = ['CustomHymnLibrary', 'HymnLyrics'];
+import { registerReflections, validateReflections } from './reflections';
+
+const roots = ['CustomHymnLibrary', 'HymnLyrics', 'SongReflections'];
 const allowedKey = new Set(['poems-services', 'favoriteList', 'favoriteSongDetails']);
 const uuid = /^[a-f0-9-]{36}$/i;
 const safeName = (s: string) =>
@@ -15,6 +17,7 @@ const safeName = (s: string) =>
 function allowed(path: string) {
   const [root, a, b, ...rest] = path.split('/');
   if (!roots.includes(root) || rest.length || !safeName(a || '')) return false;
+  if (root === 'SongReflections') return !b && /^[a-f0-9]{64}\.json$/.test(a);
   if (root === 'HymnLyrics') return !b && /^[a-f0-9]{40}\.(json|lrc)$/.test(a);
   return (!b && a === 'library.json') || (uuid.test(a) && safeName(b || '') && /\.pdf$/i.test(b));
 }
@@ -32,6 +35,7 @@ async function pack(root: string, rel: string, files: Record<string, string>) {
   }
 }
 export function registerServiceTools() {
+  registerReflections();
   ipcMain.handle('poems:diagnostics', async () => {
     const root = app.isPackaged ? process.resourcesPath : app.getAppPath();
     const assets = [
@@ -104,7 +108,7 @@ export function registerServiceTools() {
         temp,
         gzipSync(
           JSON.stringify({
-            version: 1,
+            version: 2,
             files,
             settings: Object.fromEntries(
               Object.entries(settings).filter(([k]) => allowedKey.has(k))
@@ -127,17 +131,19 @@ export function registerServiceTools() {
     const data = JSON.parse(
       gunzipSync(await fs.readFile(filePaths[0]), { maxOutputLength: 1024 ** 3 }).toString()
     );
-    if (data.version !== 1 || !data.files || !data.settings) throw Error('备份格式无效');
+    if (![1, 2].includes(data.version) || !data.files || !data.settings) throw Error('备份格式无效');
     const user = app.getPath('userData'),
       stage = await fs.mkdtemp(join(user, 'poems-restore-'));
+    const restoreRoots = data.version === 1 ? roots.filter(dir=>dir!=='SongReflections') : roots;
     const old: string[] = [],
       moved: string[] = [];
     try {
-      for (const dir of roots) await fs.mkdir(join(stage, dir));
+      for (const dir of restoreRoots) await fs.mkdir(join(stage, dir));
       for (const [key, content] of Object.entries(data.files)) {
         if (!allowed(key) || typeof content !== 'string') throw Error('备份文件名无效');
         const path = join(stage, key),
           bytes = Buffer.from(content, 'base64');
+        if (key.startsWith('SongReflections/')) validateReflections(JSON.parse(bytes.toString()));
         if (key.endsWith('/library.json')) {
           const manifest = JSON.parse(bytes.toString());
           if (
@@ -159,12 +165,12 @@ export function registerServiceTools() {
             type: 'question',
             buttons: ['取消', '恢复'],
             defaultId: 0,
-            message: '用备份替换当前歌本、校对记录、歌单和收藏？'
+            message: data.version === 2 ? '用备份替换当前歌本、心迹、校对记录、歌单和收藏？' : '恢复旧版备份？现有心迹将保留。'
           })
         ).response !== 1
       )
         return null;
-      for (const dir of roots) {
+      for (const dir of restoreRoots) {
         try {
           await fs.rename(join(user, dir), join(stage, 'old-' + dir));
           old.push(dir);

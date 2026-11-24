@@ -149,6 +149,7 @@
               {{ document.audioFileName || '尚未匹配' }}
             </span>
             <div class="flex items-center justify-end gap-1" @dblclick.stop>
+              <button v-if="isElectron" class="rounded-full px-2 py-1 text-sm hover:bg-rose-100 dark:hover:bg-neutral-800" title="写心迹" @click="journal?.open('hymn:'+document.id, document.title, document.category)"><i class="ri-quill-pen-line"/> 心迹</button>
               <button
                 v-if="isElectron"
                 title="校对、从匹配句播放或加入歌单"
@@ -185,6 +186,7 @@
       </div>
     </n-scrollbar>
 
+    <song-journal ref="journal" />
     <service-workshop
       v-if="isElectron"
       ref="workshop"
@@ -220,6 +222,7 @@
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import type { CustomHymnBook, HymnDocument } from '../../../shared/hymnLibrary';
+import SongJournal from '@/components/player/SongJournal.vue';
 import ServiceWorkshop from './ServiceWorkshop.vue';
 import baseIndex from './search-index.json';
 import LocalAiDialog from './LocalAiDialog.vue';
@@ -284,6 +287,7 @@ const categories = computed(() => {
   return [{ name: '全部', count: totalCount.value, custom: false }, ...items];
 });
 
+const journal = ref<InstanceType<typeof SongJournal>|null>(null);
 const workshop = ref<InstanceType<typeof ServiceWorkshop> | null>(null);
 const lyrics = shallowRef<Record<string, string[]>>(baseIndex);
 async function refreshLyrics() {
@@ -485,7 +489,7 @@ onMounted(async () => {
 
 .document-grid {
   display: grid;
-  grid-template-columns: 90px 130px minmax(180px, 1fr) minmax(160px, 0.8fr) 116px;
+  grid-template-columns: 90px 130px minmax(180px, 1fr) minmax(160px, 0.8fr) 178px;
   align-items: center;
   gap: 16px;
 }
@@ -497,7 +501,7 @@ onMounted(async () => {
 
 @media (max-width: 900px) {
   .document-grid {
-    grid-template-columns: 70px minmax(100px, 1fr) 116px;
+    grid-template-columns: 70px minmax(100px, 1fr) 178px;
   }
 
   .document-grid > :nth-child(2),

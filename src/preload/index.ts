@@ -77,6 +77,8 @@ const api = {
       'poems:backup',
       'poems:restore',
       'poems:diagnostics',
+      'poems:notes',
+      'poems:note-write',
       'poems:relink',
       'get-lyrics',
       'clear-lyrics-cache',

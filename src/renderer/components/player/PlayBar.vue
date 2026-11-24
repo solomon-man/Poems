@@ -60,6 +60,7 @@
         <n-ellipsis class="text-ellipsis" line-clamp="1">
           <p v-html="playMusic?.name || ''"></p>
         </n-ellipsis>
+        <button v-if="playMusic?.id && isElectron" class="mx-1 shrink-0 rounded-full px-1.5 hover:text-rose-500" title="歌曲心迹" aria-label="歌曲心迹" @click="journal?.open(String(playMusic.id).startsWith('hymn:') ? String(playMusic.id) : (playMusic.source || 'music')+':'+playMusic.id, playMusic.name || '歌曲')"><i class="ri-quill-pen-line"/></button>
         <span v-if="playbackRate !== 1.0" class="playback-rate-badge"> {{ playbackRate }}x </span>
       </div>
       <div class="music-content-name">
@@ -177,6 +178,7 @@
     </div>
     <!-- 全屏播放器 -->
     <music-full-wrapper ref="MusicFullRef" v-model="musicFullVisible" :background="background" />
+    <song-journal ref="journal" />
   </div>
 </template>
 
@@ -188,6 +190,7 @@ import { useI18n } from 'vue-i18n';
 
 import MusicFullWrapper from '@/components/lyric/MusicFullWrapper.vue';
 import AdvancedControlsPopover from '@/components/player/AdvancedControlsPopover.vue';
+import SongJournal from './SongJournal.vue';
 import ReparsePopover from '@/components/player/ReparsePopover.vue';
 import {
   allTime,
@@ -209,6 +212,7 @@ import { usePlayerStore } from '@/store/modules/player';
 import { useSettingsStore } from '@/store/modules/settings';
 import { getImgUrl, isElectron, isMobile, secondToMinute, setAnimationClass } from '@/utils';
 
+const journal=ref<InstanceType<typeof SongJournal>|null>(null);
 const playerStore = usePlayerStore();
 const settingsStore = useSettingsStore();
 const { t } = useI18n();

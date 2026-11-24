@@ -2,13 +2,13 @@
 
 ## 下载 Windows 版
 
-**[⬇ 下载 Windows x64 安装包（Poems 0.5.1）](https://github.com/solomon-man/Poems/releases/download/v0.5.1/Poems-0.5.1-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
+**[⬇ 下载 Windows x64 安装包（Poems 0.6.0）](https://github.com/solomon-man/Poems/releases/download/v0.6.0/Poems-0.6.0-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
 
 双击安装程序，选择安装目录，完成后从桌面打开 Poems。
 
 Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、歌谱检索、歌词识别和本地 AI。首次使用可先在本地音乐页选择歌曲文件夹。
 
-## 0.5.1 使用指南
+## 0.6.0 使用指南
 
 - **只记得一句歌词**：打开「诗歌本」，直接输入歌词。搜索同时匹配歌名、编号和歌词，结果显示匹配的原句。点击文件打开 PDF，点击「编排」可从匹配行试听已关联的音频。内置 1914 份歌谱中，1912 份含可提取行。扫描件请先执行「识别歌词 → PDF」，保存的识别和校对结果优先参与搜索。
 - **修复桌面入口**：重新运行 Windows 安装程序即可重建 Poems 快捷方式，指向本次安装目录。建议使用本机默认目录。
@@ -17,6 +17,12 @@ Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、
 - **换机与备份**：「聚会歌单与备份 → 备份歌库」可导出自建歌本、PDF、识别和校对结果、聚会歌单与收藏。恢复前会要求确认替换。音频文件另行复制，随后选择「重新关联音乐目录」；系统只重连文件名唯一且原路径失效的 MP3。
 
 - **开发者诊断**：打开「设置 → 关于 → 开发者诊断」，点击「检查本机环境」查看运行时版本、系统架构及歌谱目录、OCR 字库、转写脚本和本地 AI 引擎包是否存在。可复制报告用于反馈问题。检查仅在本机运行，报告不包含文件路径或歌词。
+
+## 每首歌的心迹
+
+在「诗歌本」点击歌曲旁的「心迹」，或在桌面播放栏点击歌名旁的羽毛笔，即可写下随记。每首歌可以保存多则，每则最多 10000 字；支持编辑和删除。记录按创建时间倒序显示，仅保存在本机。新版歌库备份包含心迹，恢复旧版备份会保留现有心迹。
+
+[浅色心迹界面](docs/journal-light.png) · [深色心迹界面](docs/journal-dark.png)
 
 ## 已实现功能
 
@@ -116,7 +122,7 @@ npm run build:win
 主要输出：
 
 ```text
-dist/Poems-0.5.1-win-x64.exe
+dist/Poems-0.6.0-win-x64.exe
 dist/win-unpacked/Poems.exe
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "love-hymn-player",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Poems桌面播放器",
   "author": "Poems",
   "repository": {"type":"git","url":"https://github.com/solomon-man/Poems.git"},
