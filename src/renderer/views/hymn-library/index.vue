@@ -10,6 +10,9 @@
             </p>
           </div>
           <div class="flex flex-wrap items-center justify-end gap-2">
+            <n-button v-if="isElectron" secondary @click="workshop?.open()"
+              >聚会歌单与备份</n-button
+            >
             <n-button v-if="isElectron" secondary @click="localAiDialog?.open()">
               <template #icon><i class="ri-chat-3-line" /></template>
               本地 AI
@@ -47,7 +50,7 @@
             v-model:value="searchKeyword"
             class="max-w-md"
             clearable
-            placeholder="搜索编号、分类、PDF 或 MP3 文件名"
+            placeholder="搜歌词、歌名、编号或文件名"
           >
             <template #prefix><i class="ri-search-line text-neutral-400" /></template>
           </n-input>
@@ -128,13 +131,31 @@
           >
             <span class="font-semibold tabular-nums">{{ document.number }}</span>
             <span class="text-neutral-600 dark:text-neutral-300">{{ document.category }}</span>
-            <button class="min-w-0 truncate text-left text-sm text-neutral-400" @click="openDocument(document)">
-              {{ document.relativePath }}
+            <button
+              class="min-w-0 truncate text-left text-sm text-neutral-400"
+              @click="openDocument(document)"
+            >
+              {{ document.relativePath
+              }}<small v-if="hits[document.id]" class="block truncate text-primary">{{
+                hits[document.id]
+              }}</small>
             </button>
-            <span class="min-w-0 truncate text-sm" :class="document.hasAudio ? 'text-neutral-700 dark:text-neutral-200' : 'text-neutral-400'">
+            <span
+              class="min-w-0 truncate text-sm"
+              :class="
+                document.hasAudio ? 'text-neutral-700 dark:text-neutral-200' : 'text-neutral-400'
+              "
+            >
               {{ document.audioFileName || '尚未匹配' }}
             </span>
             <div class="flex items-center justify-end gap-1" @dblclick.stop>
+              <button
+                v-if="isElectron"
+                title="校对、从匹配句播放或加入歌单"
+                @click="workshop?.open(document, hits[document.id])"
+              >
+                编排
+              </button>
               <button
                 v-if="isElectron"
                 class="h-8 w-8 shrink-0 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -164,7 +185,14 @@
       </div>
     </n-scrollbar>
 
-    <lyrics-recognition-dialog v-if="isElectron" ref="recognitionDialog" />
+    <service-workshop
+      v-if="isElectron"
+      ref="workshop"
+      :documents="documents"
+      :lyrics="lyrics"
+      @changed="reloadLibrary"
+    />
+    <lyrics-recognition-dialog @changed="refreshLyrics" v-if="isElectron" ref="recognitionDialog" />
     <local-ai-dialog v-if="isElectron" ref="localAiDialog" />
 
     <n-modal
@@ -192,6 +220,8 @@
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import type { CustomHymnBook, HymnDocument } from '../../../shared/hymnLibrary';
+import ServiceWorkshop from './ServiceWorkshop.vue';
+import baseIndex from './search-index.json';
 import LocalAiDialog from './LocalAiDialog.vue';
 import LyricsRecognitionDialog from './LyricsRecognitionDialog.vue';
 import { usePlayerStore } from '@/store/modules/player';
@@ -254,6 +284,26 @@ const categories = computed(() => {
   return [{ name: '全部', count: totalCount.value, custom: false }, ...items];
 });
 
+const workshop = ref<InstanceType<typeof ServiceWorkshop> | null>(null);
+const lyrics = shallowRef<Record<string, string[]>>(baseIndex);
+async function refreshLyrics() {
+  lyrics.value = { ...baseIndex, ...(await window.api.invoke('poems:lyrics')) };
+}
+const normalize = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLocaleLowerCase()
+    .replace(/[\s\p{P}]+/gu, '');
+const hits = computed(() => {
+  const q = normalize(searchKeyword.value),
+    found: Record<string, string> = {};
+  if (q)
+    for (const [id, rows] of Object.entries(lyrics.value)) {
+      const row = rows.find((line) => normalize(line).includes(q));
+      if (row) found[id] = row;
+    }
+  return found;
+});
 const searchFields = computed(() =>
   documents.value.map((document) =>
     [document.number, document.category, document.relativePath, document.audioFileName ?? ''].map(
@@ -270,7 +320,9 @@ const filteredDocuments = computed(() => {
   return documents.value.filter(
     (document, index) =>
       (category === '全部' || document.category === category) &&
-      (!keyword || searchFields.value[index].some((field) => field.includes(keyword)))
+      (!keyword ||
+        hits.value[document.id] ||
+        searchFields.value[index].some((field) => field.includes(keyword)))
   );
 });
 
@@ -285,6 +337,7 @@ const reloadLibrary = async (): Promise<void> => {
   rootAvailable.value = result.rootAvailable;
   documents.value = result.documents;
   customBooks.value = result.customBooks;
+  await refreshLyrics();
 };
 
 const createBook = async (): Promise<boolean> => {

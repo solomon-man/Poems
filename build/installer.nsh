@@ -10,4 +10,9 @@ ManifestSupportedOS all
     MessageBox MB_OK|MB_ICONSTOP "此应用程序需要 Windows 7 或更高版本。"
     Abort
   ${EndIf}
-!macroend 
+!macroend
+
+!macro customInstall
+  CreateShortCut "$newDesktopLink" "$appExe" "" "$appExe" 0 "" "" "Poems"
+  WinShell::SetLnkAUMI "$newDesktopLink" "${APP_ID}"
+!macroend

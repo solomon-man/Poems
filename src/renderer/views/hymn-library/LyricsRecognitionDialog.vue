@@ -90,8 +90,10 @@
 </template>
 
 <script setup lang="ts">
+const emit = defineEmits<{ changed: [] }>();
+
 import { useMessage } from 'naive-ui';
-import { computed, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
 import type {
   HymnDocument,
@@ -213,5 +215,8 @@ async function save(): Promise<void> {
   }
 }
 
+watch(visible, (value) => {
+  if (!value) emit('changed');
+});
 defineExpose({ open });
 </script>

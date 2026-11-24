@@ -3,8 +3,12 @@ import type { IpcRendererEvent } from 'electron';
 import { contextBridge, ipcRenderer } from 'electron';
 
 import type {
-  AiChatRequest, AiChatResult, AiReviewRequest, AiReviewResult,
-  ApplyLyricsReviewRequest, AppliedLyricsResult
+  AiChatRequest,
+  AiChatResult,
+  AiReviewRequest,
+  AiReviewResult,
+  ApplyLyricsReviewRequest,
+  AppliedLyricsResult
 } from '../shared/localAi';
 
 import type { AppUpdateState } from '../shared/appUpdate';
@@ -67,6 +71,12 @@ const api = {
   invoke: (channel: string, ...args: any[]) => {
     const validChannels = [
       'main-window:first-show',
+      'poems:lyrics',
+      'poems:edit',
+      'poems:project',
+      'poems:backup',
+      'poems:restore',
+      'poems:relink',
       'get-lyrics',
       'clear-lyrics-cache',
       'get-system-fonts',
@@ -100,7 +110,9 @@ const api = {
   askLocalAi: (request: AiChatRequest) =>
     ipcRenderer.invoke('local-ai:ask', request) as Promise<AiChatResult>,
   getRecognizedLyrics: (id: string) =>
-    ipcRenderer.invoke('hymn-library:load-lyrics', id) as Promise<(LyricsRecognitionResult & { source: 'audio' | 'pdf' }) | null>,
+    ipcRenderer.invoke('hymn-library:load-lyrics', id) as Promise<
+      (LyricsRecognitionResult & { source: 'audio' | 'pdf' }) | null
+    >,
   reviewLyrics: (request: AiReviewRequest) =>
     ipcRenderer.invoke('local-ai:review', request) as Promise<AiReviewResult>,
   applyLyricsReview: (request: ApplyLyricsReviewRequest) =>
@@ -109,15 +121,17 @@ const api = {
   onAiStage: (callback: (stage: string) => void) => {
     const listener = (_event: IpcRendererEvent, stage: string) => callback(stage);
     ipcRenderer.on('local-ai:stage', listener);
-    return () => { ipcRenderer.removeListener('local-ai:stage', listener); };
+    return () => {
+      ipcRenderer.removeListener('local-ai:stage', listener);
+    };
   },
   recognizeLyrics: (request: LyricsRecognitionRequest) =>
     ipcRenderer.invoke('hymn-library:recognize', request) as Promise<LyricsRecognitionResult>,
-  cancelLyricsRecognition: () => ipcRenderer.invoke('hymn-library:cancel-recognition') as Promise<void>,
+  cancelLyricsRecognition: () =>
+    ipcRenderer.invoke('hymn-library:cancel-recognition') as Promise<void>,
   saveRecognizedLyrics: (content: string, format: 'lrc' | 'txt' = 'lrc') =>
     ipcRenderer.invoke('hymn-library:save-lyrics', content, format) as Promise<boolean>,
-  listHymnDocuments: () =>
-    ipcRenderer.invoke('hymn-library:list') as Promise<HymnLibraryResult>,
+  listHymnDocuments: () => ipcRenderer.invoke('hymn-library:list') as Promise<HymnLibraryResult>,
   createCustomHymnBook: (name: string) =>
     ipcRenderer.invoke('hymn-library:create-book', name) as Promise<CustomHymnBook>,
   removeCustomHymnBook: (bookId: string) =>
@@ -128,8 +142,7 @@ const api = {
     ipcRenderer.invoke('hymn-library:import-audio', category) as Promise<HymnImportResult>,
   getHymnPlayback: (id: string) =>
     ipcRenderer.invoke('hymn-library:playback', id) as Promise<HymnPlayback | null>,
-  openHymnDocument: (id: string) =>
-    ipcRenderer.invoke('hymn-library:open', id) as Promise<string>,
+  openHymnDocument: (id: string) => ipcRenderer.invoke('hymn-library:open', id) as Promise<string>,
 
   // Download manager
   downloadAdd: (task: any) => ipcRenderer.invoke('download:add', task),

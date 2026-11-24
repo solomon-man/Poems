@@ -1,3 +1,5 @@
+import { registerServiceTools } from './serviceTools';
+import { loadRecognition, storeRecognition } from './recognizedLyrics';
 import { createHash, randomUUID } from 'crypto';
 import { app, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'fs';
@@ -41,9 +43,7 @@ type ResolvedDocument = HymnDocument & { filePath: string };
 const EMPTY_MANIFEST: HymnManifest = { books: [], documents: [], audioLinks: {} };
 
 const getBuiltinRoot = (): string =>
-  app.isPackaged
-    ? join(process.resourcesPath, 'hymns')
-    : join(app.getAppPath(), 'songbooks');
+  app.isPackaged ? join(process.resourcesPath, 'hymns') : join(app.getAppPath(), 'songbooks');
 const getCustomRoot = (): string => join(app.getPath('userData'), 'CustomHymnLibrary');
 const getManifestPath = (): string => join(getCustomRoot(), 'library.json');
 const getLyricsRoot = (): string => join(app.getPath('userData'), 'HymnLyrics');
@@ -219,7 +219,9 @@ const getOrCreateLyrics = async (
     return await fs.readFile(cachePath, 'utf8');
   } catch {
     const lines = await extractPdfLyrics(document.filePath, {
-      title: document.title, modelDirectory: ocrModelDirectory(), ocr: false
+      title: document.title,
+      modelDirectory: ocrModelDirectory(),
+      ocr: false
     });
     const lyrics = buildTimedLyrics(lines, audio.duration);
     if (lyrics) {
@@ -231,14 +233,139 @@ const getOrCreateLyrics = async (
 };
 
 export function initializeHymnLibrary(): void {
+  registerServiceTools();
+  const customText = new Map<string, { stamp: number; lines: string[] }>();
+  ipcMain.handle('poems:lyrics', async () => {
+    const manifest = await readManifest(),
+      docs = await resolveDocuments(manifest);
+    const files = new Set(await fs.readdir(getLyricsRoot()).catch(() => []));
+    const output: Record<string, string[]> = {};
+    for (const doc of docs) {
+      const audio = manifest.audioLinks[doc.id];
+      const stem = createHash('sha1').update(doc.id).digest('hex');
+      if (files.has(stem + '.json')) {
+        const result = await loadRecognition(doc.id, audio?.path, audio?.duration ?? 0);
+        if (result?.text) {
+          output[doc.id] = result.text.split(/\r?\n/);
+          continue;
+        }
+      }
+      if (doc.source === 'custom') {
+        try {
+          const stamp = (await fs.stat(doc.filePath)).mtimeMs;
+          if (customText.get(doc.id)?.stamp !== stamp)
+            customText.set(doc.id, {
+              stamp,
+              lines: await extractPdfLyrics(doc.filePath, {
+                title: doc.title,
+                modelDirectory: ocrModelDirectory(),
+                ocr: false
+              })
+            });
+          output[doc.id] = customText.get(doc.id)!.lines;
+        } catch {
+          continue;
+        }
+      }
+    }
+    return output;
+  });
+  ipcMain.handle('poems:edit', async (_, id: string, lines: { ms: number; text: string }[]) => {
+    const manifest = await readManifest();
+    if (
+      !(await resolveDocuments(manifest)).some((d) => d.id === id) ||
+      !Array.isArray(lines) ||
+      !lines.length ||
+      lines.some(
+        (l, i) =>
+          !Number.isFinite(l.ms) ||
+          l.ms < 0 ||
+          (i > 0 && l.ms < lines[i - 1].ms) ||
+          typeof l.text !== 'string' ||
+          !l.text.trim() ||
+          /[\r\n]/.test(l.text)
+      )
+    )
+      throw Error('请检查空行和时间顺序');
+    const audio = manifest.audioLinks[id],
+      signal = new AbortController().signal;
+    if (!audio) {
+      await storeRecognition(id, { source: 'pdf', lines: lines.map((l) => l.text) }, signal);
+      return;
+    }
+    const stat = await fs.stat(audio.path);
+    const lrc = lines
+      .map(
+        (l) =>
+          '[' +
+          String(Math.floor(l.ms / 60000)).padStart(2, '0') +
+          ':' +
+          ((l.ms % 60000) / 1000).toFixed(3).padStart(6, '0') +
+          ']' +
+          l.text
+      )
+      .join('\n');
+    await storeRecognition(
+      id,
+      { source: 'audio', path: audio.path, size: stat.size, mtimeMs: stat.mtimeMs, lrc },
+      signal
+    );
+  });
+  ipcMain.handle('poems:relink', async () => {
+    const choice = await dialog.showOpenDialog({ properties: ['openDirectory'] });
+    if (choice.canceled) return null;
+    const files = await walkFiles(choice.filePaths[0], ['.mp3']);
+    const names = new Map<string, string[]>();
+    for (const path of files) {
+      const k = basename(path).toLowerCase();
+      names.set(k, [...(names.get(k) ?? []), path]);
+    }
+    const manifest = await readManifest();
+    let count = 0;
+    for (const [id, audio] of Object.entries(manifest.audioLinks)) {
+      if (
+        await fs.access(audio.path).then(
+          () => true,
+          () => false
+        )
+      )
+        continue;
+      const matches = names.get(basename(audio.path).toLowerCase());
+      if (matches?.length === 1) {
+        const previous = audio.path;
+        audio.path = matches[0];
+        const file = lyricsCachePath(id).replace(/\.lrc$/, '.json');
+        try {
+          const record = JSON.parse(await fs.readFile(file, 'utf8'));
+          const stat = await fs.stat(audio.path);
+          if (record.source === 'audio' && record.path === previous && stat.size === record.size)
+            await storeRecognition(
+              id,
+              { ...record, path: audio.path, mtimeMs: stat.mtimeMs },
+              new AbortController().signal
+            );
+        } catch {
+          /* No recognition record for this item. */
+        }
+        count++;
+      }
+    }
+    await writeManifest(manifest);
+    return count;
+  });
   initializeLyricsRecognition(async (id) => {
     const manifest = await readManifest();
-    const document = (await resolveDocuments(manifest)).find(item => item.id === id);
+    const document = (await resolveDocuments(manifest)).find((item) => item.id === id);
     if (!document) return undefined;
     const root = document.source === 'builtin' ? getBuiltinRoot() : getCustomRoot();
     if (!isInsideRoot(root, document.filePath)) throw new Error('无效的歌谱路径');
     const audio = manifest.audioLinks[id];
-    return { pdf: document.filePath, title: document.title, audio: audio?.path, duration: audio?.duration ?? 0 };
+    return {
+      pdf: document.filePath,
+      title: document.title,
+      audio: audio?.path,
+      duration: audio?.duration ?? 0
+    };
   });
   ipcMain.handle('hymn-library:list', async (): Promise<HymnLibraryResult> => {
     const manifest = await readManifest();
@@ -251,10 +378,16 @@ export function initializeHymnLibrary(): void {
   });
 
   ipcMain.handle('hymn-library:create-book', async (_, name: string): Promise<CustomHymnBook> => {
-    const trimmedName = String(name ?? '').trim().slice(0, 40);
+    const trimmedName = String(name ?? '')
+      .trim()
+      .slice(0, 40);
     if (!trimmedName) throw new Error('请输入诗歌本名称');
     const manifest = await readManifest();
-    if (manifest.books.some((book) => book.name.toLocaleLowerCase('zh-CN') === trimmedName.toLocaleLowerCase('zh-CN'))) {
+    if (
+      manifest.books.some(
+        (book) => book.name.toLocaleLowerCase('zh-CN') === trimmedName.toLocaleLowerCase('zh-CN')
+      )
+    ) {
       throw new Error('已存在同名诗歌本');
     }
     const book = { id: randomUUID(), name: trimmedName, createdAt: Date.now() };
@@ -268,85 +401,103 @@ export function initializeHymnLibrary(): void {
     const manifest = await readManifest();
     if (!manifest.books.some((book) => book.id === bookId)) return false;
     const removedIds = new Set(
-      manifest.documents.filter((document) => document.bookId === bookId).map((document) => document.id)
+      manifest.documents
+        .filter((document) => document.bookId === bookId)
+        .map((document) => document.id)
     );
     manifest.books = manifest.books.filter((book) => book.id !== bookId);
     manifest.documents = manifest.documents.filter((document) => document.bookId !== bookId);
     for (const id of removedIds) delete manifest.audioLinks[id];
     await writeManifest(manifest);
     const bookPath = join(getCustomRoot(), bookId);
-    if (isInsideRoot(getCustomRoot(), bookPath)) await fs.rm(bookPath, { recursive: true, force: true });
+    if (isInsideRoot(getCustomRoot(), bookPath))
+      await fs.rm(bookPath, { recursive: true, force: true });
     return true;
   });
 
-  ipcMain.handle('hymn-library:import-pdfs', async (_, bookId: string): Promise<HymnImportResult> => {
-    const manifest = await readManifest();
-    if (!manifest.books.some((book) => book.id === bookId)) throw new Error('自定义诗歌本不存在');
-    const result = await dialog.showOpenDialog({
-      title: '选择诗歌 PDF',
-      properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'PDF 文件', extensions: ['pdf'] }]
-    });
-    if (result.canceled) return { canceled: true, imported: 0 };
+  ipcMain.handle(
+    'hymn-library:import-pdfs',
+    async (_, bookId: string): Promise<HymnImportResult> => {
+      const manifest = await readManifest();
+      if (!manifest.books.some((book) => book.id === bookId)) throw new Error('自定义诗歌本不存在');
+      const result = await dialog.showOpenDialog({
+        title: '选择诗歌 PDF',
+        properties: ['openFile', 'multiSelections'],
+        filters: [{ name: 'PDF 文件', extensions: ['pdf'] }]
+      });
+      if (result.canceled) return { canceled: true, imported: 0 };
 
-    const targetRoot = join(getCustomRoot(), bookId);
-    await fs.mkdir(targetRoot, { recursive: true });
-    let imported = 0;
-    for (const sourcePath of result.filePaths) {
-      const originalName = basename(sourcePath);
-      let targetName = originalName;
-      let suffix = 2;
-      while (manifest.documents.some((item) => item.bookId === bookId && item.fileName === targetName)) {
-        targetName = `${basename(originalName, extname(originalName))}-${suffix}${extname(originalName)}`;
-        suffix += 1;
+      const targetRoot = join(getCustomRoot(), bookId);
+      await fs.mkdir(targetRoot, { recursive: true });
+      let imported = 0;
+      for (const sourcePath of result.filePaths) {
+        const originalName = basename(sourcePath);
+        let targetName = originalName;
+        let suffix = 2;
+        while (
+          manifest.documents.some((item) => item.bookId === bookId && item.fileName === targetName)
+        ) {
+          targetName = `${basename(originalName, extname(originalName))}-${suffix}${extname(originalName)}`;
+          suffix += 1;
+        }
+        await fs.copyFile(sourcePath, join(targetRoot, targetName));
+        const title = basename(targetName, extname(targetName));
+        const number = numericKey(title) ?? title;
+        manifest.documents.push({
+          id: `custom:${randomUUID()}`,
+          bookId,
+          title,
+          number,
+          fileName: targetName
+        });
+        imported += 1;
       }
-      await fs.copyFile(sourcePath, join(targetRoot, targetName));
-      const title = basename(targetName, extname(targetName));
-      const number = numericKey(title) ?? title;
-      manifest.documents.push({ id: `custom:${randomUUID()}`, bookId, title, number, fileName: targetName });
-      imported += 1;
+      await writeManifest(manifest);
+      return { canceled: false, imported };
     }
-    await writeManifest(manifest);
-    return { canceled: false, imported };
-  });
+  );
 
-  ipcMain.handle('hymn-library:import-audio', async (_, category: string): Promise<HymnImportResult> => {
-    const result = await dialog.showOpenDialog({
-      title: `选择“${category}”的 MP3 文件夹`,
-      properties: ['openDirectory']
-    });
-    if (result.canceled || !result.filePaths[0]) return { canceled: true, imported: 0, matched: 0 };
+  ipcMain.handle(
+    'hymn-library:import-audio',
+    async (_, category: string): Promise<HymnImportResult> => {
+      const result = await dialog.showOpenDialog({
+        title: `选择“${category}”的 MP3 文件夹`,
+        properties: ['openDirectory']
+      });
+      if (result.canceled || !result.filePaths[0])
+        return { canceled: true, imported: 0, matched: 0 };
 
-    const manifest = await readManifest();
-    const candidates = (await resolveDocuments(manifest))
-      .filter((document) => document.category === category)
-      .map(toAudioCandidate);
-    const audioFiles = await walkFiles(result.filePaths[0], ['.mp3']);
-    const unmatched: string[] = [];
-    let matched = 0;
-    for (const filePath of audioFiles) {
-      const documentId = findAudioMatch(filePath, candidates);
-      if (!documentId) {
-        unmatched.push(basename(filePath));
-        continue;
+      const manifest = await readManifest();
+      const candidates = (await resolveDocuments(manifest))
+        .filter((document) => document.category === category)
+        .map(toAudioCandidate);
+      const audioFiles = await walkFiles(result.filePaths[0], ['.mp3']);
+      const unmatched: string[] = [];
+      let matched = 0;
+      for (const filePath of audioFiles) {
+        const documentId = findAudioMatch(filePath, candidates);
+        if (!documentId) {
+          unmatched.push(basename(filePath));
+          continue;
+        }
+        try {
+          const metadata = await mm.parseFile(filePath, { skipCovers: true });
+          manifest.audioLinks[documentId] = {
+            path: filePath,
+            duration: Math.round((metadata.format.duration ?? 0) * 1000),
+            title: metadata.common.title || basename(filePath, extname(filePath)),
+            artist: metadata.common.artist || '诗歌本'
+          };
+          matched += 1;
+        } catch (error) {
+          console.error(`[hymn-library] Failed to read MP3: ${filePath}`, error);
+          unmatched.push(basename(filePath));
+        }
       }
-      try {
-        const metadata = await mm.parseFile(filePath, { skipCovers: true });
-        manifest.audioLinks[documentId] = {
-          path: filePath,
-          duration: Math.round((metadata.format.duration ?? 0) * 1000),
-          title: metadata.common.title || basename(filePath, extname(filePath)),
-          artist: metadata.common.artist || '诗歌本'
-        };
-        matched += 1;
-      } catch (error) {
-        console.error(`[hymn-library] Failed to read MP3: ${filePath}`, error);
-        unmatched.push(basename(filePath));
-      }
+      await writeManifest(manifest);
+      return { canceled: false, imported: audioFiles.length, matched, unmatched };
     }
-    await writeManifest(manifest);
-    return { canceled: false, imported: audioFiles.length, matched, unmatched };
-  });
+  );
 
   ipcMain.handle('hymn-library:playback', async (_, id: string): Promise<HymnPlayback | null> => {
     const manifest = await readManifest();
@@ -375,7 +526,8 @@ export function initializeHymnLibrary(): void {
   ipcMain.handle('hymn-library:open', async (_, id: string): Promise<string> => {
     const manifest = await readManifest();
     const document = (await resolveDocuments(manifest)).find((item) => item.id === id);
-    if (!document || extname(document.filePath).toLowerCase() !== '.pdf') return '无效的诗歌文件路径';
+    if (!document || extname(document.filePath).toLowerCase() !== '.pdf')
+      return '无效的诗歌文件路径';
     const allowedRoot = document.source === 'builtin' ? getBuiltinRoot() : getCustomRoot();
     if (!isInsideRoot(allowedRoot, document.filePath)) return '无效的诗歌文件路径';
     return await shell.openPath(document.filePath);
