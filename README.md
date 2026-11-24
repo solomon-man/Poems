@@ -2,13 +2,13 @@
 
 ## 下载 Windows 版
 
-**[⬇ 下载 Windows x64 安装包（Poems 0.7.0）](https://github.com/solomon-man/Poems/releases/download/v0.7.0/Poems-0.7.0-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
+**[⬇ 下载 Windows x64 安装包（Poems 0.8.0）](https://github.com/solomon-man/Poems/releases/download/v0.8.0/Poems-0.8.0-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
 
 双击安装程序，选择安装目录，完成后从桌面打开 Poems。
 
 Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、歌谱检索、歌词识别和本地 AI。首次使用可先在本地音乐页选择歌曲文件夹。
 
-## 0.7.0 使用指南
+## 0.8.0 使用指南
 
 - **只记得一句歌词**：打开「诗歌本」，直接输入歌词。搜索同时匹配歌名、编号和歌词，结果显示匹配的原句。点击文件打开 PDF，点击「编排」可从匹配行试听已关联的音频。内置 1914 份歌谱中，1912 份含可提取行。扫描件请先执行「识别歌词 → PDF」，保存的识别和校对结果优先参与搜索。
 - **修复桌面入口**：重新运行 Windows 安装程序即可重建 Poems 快捷方式，指向本次安装目录。建议使用本机默认目录。
@@ -20,9 +20,11 @@ Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、
 
 ## 作者、白版司琴与界面配色
 
-在诗歌本按词曲作者筛选。作者信息来自明确的谱面署名、匹配 MP3 的作词作曲标签，或你在「司琴谱」里补录的署名。用「识别蓝版 / 白版 PDF」预览原文件；程序读取文字层，扫描页调用本地 OCR，根据版别文字、和弦和简谱特征提出建议。请核对结果并确认归档，原 PDF 随自建歌本保存。白版支持录入 `[C]歌词 [G7]歌词`，在白底谱面上显示和弦，可按演奏顺序排入独立司琴歌单。自带一份四小节练习，其余白版可自行导入。司琴资料随歌库备份保存。
+诗歌本只有一个搜索框，支持作者、歌手、歌名、编号和歌词。点击「作者与歌手」或搜索结果中的人物卡片，即可查看该人的歌曲和歌谱；本地音乐也按演唱者归集。作者信息来自明确的谱面署名、匹配 MP3 的作词作曲标签，或你在「司琴谱」里补录的署名。用「识别蓝版 / 白版 PDF」预览原文件；程序读取文字层，扫描页调用本地 OCR，根据版别文字、和弦和简谱特征提出建议。请核对结果并确认归档，原 PDF 随自建歌本保存。白版支持录入 `[C]歌词 [G7]歌词`，在白底谱面上显示和弦，可按演奏顺序排入独立司琴歌单。自带一份四小节练习，其余白版可自行导入。司琴资料随歌库备份保存。
 
 在「设置 → 基本设置 → 界面配色」切换 Poems 经典、[Nord 极光](https://github.com/nordtheme/nord) 或 [Catppuccin 拿铁](https://github.com/catppuccin/catppuccin)。各配色支持明暗模式，司琴谱始终使用白底。
+
+蓝版采用单页清晰阅谱，可翻页或使用系统 PDF 阅读器。发行版将已知蓝版模板的装饰背景改为纯蓝底；字体子集仅在逐页文字和像素与清理后的母版一致时采用。打包前请运行 `python -m pip install pymupdf`，构建脚本会自动生成发行用歌谱。
 
 ## 每首歌的心迹
 
@@ -128,7 +130,7 @@ npm run build:win
 主要输出：
 
 ```text
-dist/Poems-0.7.0-win-x64.exe
+dist/Poems-0.8.0-win-x64.exe
 dist/win-unpacked/Poems.exe
 ```
 

@@ -512,3 +512,18 @@ export async function readScorePages(file: string, modelDirectory: string) {
       .join('、')
   };
 }
+export async function renderScorePage(file:string,requested:number) {
+  const task=getDocument({data:new Uint8Array(await readFile(file)),useSystemFonts:true});
+  try{
+    const pdf=await task.promise;
+    const number=Math.min(pdf.numPages,Math.max(1,Math.floor(requested)||1));
+    const page=await pdf.getPage(number), original=page.getViewport({scale:1});
+    const viewport=page.getViewport({scale:Math.min(3,2160/Math.max(original.width,original.height))});
+    const factory=pdf.canvasFactory as CanvasFactory;
+    const surface=factory.create(Math.ceil(viewport.width),Math.ceil(viewport.height));
+    try{
+      await page.render({canvas:surface.canvas as unknown as HTMLCanvasElement,viewport}).promise;
+      return {number,total:pdf.numPages,image:'data:image/png;base64,'+(await surface.canvas.encode('png')).toString('base64')};
+    }finally{factory.destroy(surface);page.cleanup()}
+  }finally{await task.destroy()}
+}

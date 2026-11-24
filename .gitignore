@@ -53,3 +53,4 @@ AGENTS.md
 
 src/renderer/auto-imports.d.ts
 src/renderer/components.d.ts
+/build/blue-scores/

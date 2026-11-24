@@ -7,7 +7,7 @@ import * as mm from 'music-metadata';
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { initializeLyricsRecognition, ocrModelDirectory } from './lyricsRecognition';
 import { buildTimedLyrics, readRecognizedLyrics } from './recognizedLyrics';
-import { extractPdfLyrics, readScorePages } from './pdfLyrics';
+import { extractPdfLyrics, readScorePages, renderScorePage } from './pdfLyrics';
 
 import type {
   CustomHymnBook,
@@ -117,6 +117,7 @@ const buildBuiltinDocuments = async (manifest: HymnManifest): Promise<ResolvedDo
       source: 'builtin',
       hasAudio: Boolean(audio),
       authors: audio?.authors,
+      performer: audio?.artist==='诗歌本'?undefined:audio?.artist,
       audioFileName: audio ? basename(audio.path) : undefined,
       lyricsReady: false,
       filePath
@@ -148,6 +149,7 @@ const buildCustomDocuments = async (manifest: HymnManifest): Promise<ResolvedDoc
         bookId: document.bookId,
         hasAudio: Boolean(audio),
       authors: audio?.authors,
+      performer: audio?.artist==='诗歌本'?undefined:audio?.artist,
         audioFileName: audio ? basename(audio.path) : undefined,
         lyricsReady,
         filePath
@@ -237,6 +239,19 @@ const getOrCreateLyrics = async (
 
 export function initializeHymnLibrary(): void {
   registerServiceTools();
+  ipcMain.handle('poems:score-page',async(_,id:string,page:number)=>{
+    const manifest=await readManifest();
+    if(id.startsWith('builtin:')){
+      const root=getBuiltinRoot(), path=join(root,id.slice(8));
+      if(!isInsideRoot(root,path)||extname(path).toLowerCase()!=='.pdf')throw Error('无效歌谱');
+      return renderScorePage(path,page);
+    }
+    const doc=manifest.documents.find(d=>d.id===id);
+    if(!doc)throw Error('歌谱不存在');
+    const path=join(getCustomRoot(),doc.bookId,doc.fileName);
+    if(!isInsideRoot(getCustomRoot(),path))throw Error('无效歌谱');
+    return renderScorePage(path,page);
+  });
   let pendingScore:{path:string,token:string}|undefined;
   ipcMain.handle('poems:score-read',async ()=>{
     const choice=await dialog.showOpenDialog({properties:['openFile'],filters:[{name:'PDF 歌谱',extensions:['pdf']}]});

@@ -17,7 +17,7 @@ const { _electron } = require('playwright');
     await page.evaluate(() => {
       location.hash = '/hymn-library';
     });
-    const query = page.getByPlaceholder('搜歌词、歌名、编号或文件名');
+    const query = page.getByPlaceholder('搜作者、歌手、歌名或歌词');
     await query.fill('爱随着光释放');
     console.log('search ready');
     const row = page.locator('.document-row').first();

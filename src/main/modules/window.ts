@@ -318,6 +318,21 @@ export function createMainWindow(icon: Electron.NativeImage): BrowserWindow {
 
   // 创建窗口
   const mainWindow = new BrowserWindow(options);
+  if(process.platform==='win32'){
+    const roundWindow=()=>{
+      if(mainWindow.isDestroyed())return;
+      if(mainWindow.isMaximized()||mainWindow.isFullScreen()){mainWindow.setShape([]);return}
+      const [width,height]=mainWindow.getSize(), radius=Math.min(20,Math.floor(height/2));
+      const shape=[{x:0,y:radius,width,height:height-2*radius}];
+      for(let y=0;y<radius;y++){
+        const inset=Math.ceil(radius*(1-Math.pow(1-Math.pow(1-(y+0.5)/radius,3),1/3)));
+        shape.push({x:inset,y,width:width-2*inset,height:1},{x:inset,y:height-1-y,width:width-2*inset,height:1});
+      }
+      mainWindow.setShape(shape);
+    };
+    mainWindow.on('resize',roundWindow);mainWindow.on('maximize',roundWindow);mainWindow.on('unmaximize',roundWindow);mainWindow.on('enter-full-screen',roundWindow);mainWindow.on('leave-full-screen',roundWindow);
+    roundWindow();
+  }
   firstMainWindowShow = new Promise<void>((resolve) => mainWindow.once('show', () => resolve()));
 
   const appOrigin = (() => {

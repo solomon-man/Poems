@@ -13,7 +13,7 @@ const assert = require('node:assert/strict'),
     page.setDefaultTimeout(20000);
     await page.waitForLoadState('domcontentloaded');
     await page.evaluate(() => (location.hash = '/hymn-library'));
-    const filter = page.getByPlaceholder('按词曲作者筛选');
+    const filter = page.getByPlaceholder('搜作者、歌手、歌名或歌词');
     await filter.fill('宣信');
     await page.locator('.document-row').first().getByText('宣信').waitFor();
     const file = path.join(tmp, '练习.pdf');

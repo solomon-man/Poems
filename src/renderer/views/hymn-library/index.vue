@@ -52,15 +52,16 @@
           </div>
         </div>
         <div class="mt-5 flex flex-wrap items-center gap-3">
-          <n-input v-model:value="authorFilter" clearable placeholder="按词曲作者筛选" class="max-w-xs" />
+
           <n-input
             v-model:value="searchKeyword"
             class="max-w-md"
             clearable
-            placeholder="搜歌词、歌名、编号或文件名"
+            placeholder="搜作者、歌手、歌名或歌词"
           >
             <template #prefix><i class="ri-search-line text-neutral-400" /></template>
           </n-input>
+          <n-button secondary @click="browseAuthors=!browseAuthors; selectedPerson=''">作者与歌手</n-button>
           <n-button
             v-if="activeCustomBook"
             quaternary
@@ -74,7 +75,18 @@
       </header>
 
       <div class="px-8 pb-32 pt-5">
-        <div class="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="诗歌分类">
+        <section v-if="selectedPerson" class="person-hero">
+          <div class="person-avatar">{{selectedPerson.slice(0,1)}}</div><div><button @click="selectedPerson='';browseAuthors=true">‹ 所有作者与歌手</button><h2>{{selectedPerson}}</h2><p>{{filteredDocuments.length+localResults.length}} 首作品</p></div>
+        </section>
+        <section v-else-if="browseAuthors || (searchKeyword.trim() && foundPeople.length)" class="people-section">
+          <h2>作者与歌手</h2><div class="people-list"><button v-for="person in foundPeople" :key="person.name" @click="openPerson(person.name)">
+          <span>{{person.name.slice(0,1)}}</span><strong>{{person.name}}</strong><small>{{person.count}} 首 · {{person.roles.join(' / ')}}</small></button></div>
+          <p v-if="!foundPeople.length">没有匹配的作者或歌手。</p>
+        </section>
+        <section v-if="localResults.length" class="people-section"><h2>本地歌曲</h2>
+          <button class="local-result" v-for="track in localResults.slice(0,limit)" :key="track.id" @click="playLocal(track)"><i class="ri-play-circle-line"/><strong>{{track.title}}</strong><span>{{track.artist}} · {{track.album}}</span></button>
+        </section>
+        <div v-if="!selectedPerson" class="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="诗歌分类">
           <button
             v-for="category in categories"
             :key="category.name"
@@ -90,7 +102,7 @@
         </div>
 
         <div
-          v-if="selectedCategory === '全部'"
+          v-if="selectedCategory === '全部' && !selectedPerson && !searchKeyword"
           class="mb-4 border-l-2 border-primary bg-neutral-50 px-4 py-3 text-sm text-neutral-600 dark:bg-neutral-900/60 dark:text-neutral-300"
         >
           选择一本诗歌本后，可按 MP3 文件名中的编号自动匹配音频；首次播放会从 PDF
@@ -130,7 +142,7 @@
           </div>
 
           <div
-            v-for="document in filteredDocuments"
+            v-for="document in filteredDocuments.slice(0,limit)"
             v-else
             :key="document.id"
             class="document-grid document-row"
@@ -142,7 +154,7 @@
               class="min-w-0 truncate text-left text-sm text-neutral-400"
               @click="openDocument(document)"
             >
-              <small v-if="author(document)" class="block">{{author(document)}}</small>{{ document.source==='custom' ? document.title : document.relativePath
+              <small v-if="author(document)" class="block">{{author(document)}}</small>{{ songTitle(document)
               }}<small v-if="hits[document.id]" class="block truncate text-primary">{{
                 hits[document.id]
               }}</small>
@@ -191,6 +203,7 @@
             </div>
           </div>
         </div>
+        <n-button v-if="filteredDocuments.length>limit || localResults.length>limit" class="mt-4" @click="limit+=60">显示更多歌曲</n-button>
       </div>
     </n-scrollbar>
 
@@ -202,6 +215,10 @@
       <div class="mt-4 flex justify-end gap-2"><n-button @click="preview=null">取消</n-button><n-button type="primary" :disabled="!edition" :loading="importBusy" @click="confirmScore">确认导入</n-button></div></template>
     </n-modal>
     <piano-book ref="piano" :documents="documents" :lyrics="lyrics" :scores="scores" @change="saveScore" />
+    <n-modal v-model:show="scoreVisible" preset="card" :title="scoreDoc?songTitle(scoreDoc):'蓝版歌谱'" style="width:min(1080px,95vw)">
+      <div class="score-nav"><n-button :disabled="scoreBusy || !scorePage || scorePage.number<=1" @click="turnPage(-1)">上一页</n-button><span>{{scorePage?.number||1}} / {{scorePage?.total||'…'}}</span><n-button :disabled="scoreBusy || !scorePage || scorePage.number>=scorePage.total" @click="turnPage(1)">下一页</n-button><n-button text @click="externalScore">用系统打开 PDF</n-button></div>
+      <div class="clean-page"><n-spin v-if="scoreBusy"/><img v-else-if="scorePage" :src="scorePage.image" alt="蓝版歌谱"/></div>
+    </n-modal>
     <song-journal ref="journal" />
     <service-workshop
       v-if="isElectron"
@@ -235,10 +252,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 
 import type { CustomHymnBook, HymnDocument } from '../../../shared/hymnLibrary';
 import SongJournal from '@/components/player/SongJournal.vue';
+import {useLocalMusicStore} from '@/store/modules/localMusic';
+import titles from './titles.json';
 import printedCredits from './credits.json';
 import PianoBook from './PianoBook.vue';
 import ServiceWorkshop from './ServiceWorkshop.vue';
@@ -310,10 +329,17 @@ type Score = {author:string,chart:string};
 type ScorePreview={edition:'blue'|'white'|'unknown',raw:string,author:string,token:string,name:string,scanned:boolean,chords:string[]};
 const preview=ref<ScorePreview|null>(null), edition=ref(''), readingScore=ref(false),importBusy=ref(false);
 async function readScore(){readingScore.value=true;try{preview.value=await window.api.invoke('poems:score-read');edition.value=preview.value?.edition==='unknown'?'':preview.value?.edition||''}catch(e){message.error(String(e))}finally{readingScore.value=false}}
-async function confirmScore(){if(!preview.value||!edition.value||importBusy.value)return;importBusy.value=true;try{const id=await window.api.invoke('poems:score-import',preview.value.token,edition.value);saveScore(id,{author:preview.value.author,chart:preview.value.raw});preview.value=null;await reloadLibrary();selectedCategory.value=edition.value==='white'?'白版 · 司琴谱':'蓝版 · 歌谱';searchKeyword.value='';authorFilter.value='';if(edition.value==='white')piano.value?.open(id);message.success('已保存原谱和识别内容')}catch(e){message.error(String(e))}finally{importBusy.value=false}}
+async function confirmScore(){if(!preview.value||!edition.value||importBusy.value)return;importBusy.value=true;try{const id=await window.api.invoke('poems:score-import',preview.value.token,edition.value);saveScore(id,{author:preview.value.author,chart:preview.value.raw});preview.value=null;await reloadLibrary();selectedCategory.value=edition.value==='white'?'白版 · 司琴谱':'蓝版 · 歌谱';searchKeyword.value='';selectedPerson.value='';if(edition.value==='white')piano.value?.open(id);message.success('已保存原谱和识别内容')}catch(e){message.error(String(e))}finally{importBusy.value=false}}
 const piano=ref<InstanceType<typeof PianoBook>|null>(null);
 const scores=ref<Record<string,Score>>(JSON.parse(localStorage.getItem('poems-piano-scores')||'{}'));
-const authorFilter=ref('');
+const selectedPerson=ref(''),browseAuthors=ref(false),limit=ref(60);
+const local=useLocalMusicStore();
+const songTitle=(d:HymnDocument)=>(titles as Record<string,string>)[d.id]||d.title;
+const names=(v:string)=>[...new Set(v.split(/[、;；&＆，,]/).map(s=>s.trim()).filter(s=>s && !['未知艺术家','未知歌手','Unknown Artist'].includes(s)))];
+function openPerson(name:string){selectedPerson.value=name;searchKeyword.value='';selectedCategory.value='全部';browseAuthors.value=false}
+watch([searchKeyword,selectedPerson,selectedCategory],()=>limit.value=60);
+async function playLocal(track:LocalMusicEntry){const songs=localResults.value.map(toSongResult);playerStore.setPlayList(songs);await playerStore.setPlay(toSongResult(track))}
+
 const author=(d:HymnDocument)=>scores.value[d.id]?.author || d.authors?.join('、') || (printedCredits as Record<string,string>)[d.id] || '';
 function saveScore(id:string,value:Score){scores.value[id]=value;localStorage.setItem('poems-piano-scores',JSON.stringify(scores.value))}
 const journal = ref<InstanceType<typeof SongJournal>|null>(null);
@@ -327,19 +353,31 @@ const normalize = (s: string) =>
     .normalize('NFKC')
     .toLocaleLowerCase()
     .replace(/[\s\p{P}]+/gu, '');
+const docPeople=(d:HymnDocument)=>names(author(d)+'、'+(d.performer||''));
+const people=computed(()=>{
+  const people=new Map<string,{name:string,count:number,roles:string[]}>();
+  function add(name:string,role:string,count=true){const p=people.get(name)??{name,count:0,roles:[]};if(count)p.count++;if(!p.roles.includes(role))p.roles.push(role);people.set(name,p)}
+  for(const d of documents.value){const writers=names(author(d));for(const w of writers)add(w,'词曲');for(const v of names(d.performer||''))add(v,'演唱',!writers.includes(v))}
+  for(const t of local.musicList)for(const n of names(t.artist))add(n,'演唱');
+  return Array.from(people.values()).sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'zh-CN'));
+});
+const foundPeople=computed(()=>people.value.filter(p=>normalize(p.name).includes(normalize(searchKeyword.value))));
+const localResults=computed(()=>{const q=normalize(searchKeyword.value),person=selectedPerson.value;if(!q&&!person)return [];
+return local.musicList.filter(t=>(!person||names(t.artist).includes(person))&&(!q||normalize([t.artist,t.title,t.album,t.lyrics||''].join(' ')).includes(q)))});
+const indexedLines=computed(()=>Object.fromEntries(Object.entries(lyrics.value).map(([id,lines])=>[id,lines.map(normalize)])));
 const hits = computed(() => {
   const q = normalize(searchKeyword.value),
     found: Record<string, string> = {};
   if (q)
-    for (const [id, rows] of Object.entries(lyrics.value)) {
-      const row = rows.find((line) => normalize(line).includes(q));
-      if (row) found[id] = row;
+    for (const [id, rows] of Object.entries(indexedLines.value)) {
+      const i = rows.findIndex(line => line.includes(q));
+      if (i>=0) found[id] = lyrics.value[id][i];
     }
   return found;
 });
 const searchFields = computed(() =>
   documents.value.map((document) =>
-    [document.number, document.category, document.relativePath, document.audioFileName ?? ''].map(
+    [songTitle(document),author(document),document.performer||'',document.number, document.category, document.relativePath, document.audioFileName ?? ''].map(
       (field) => field.toLocaleLowerCase('zh-CN')
     )
   )
@@ -348,12 +386,12 @@ const searchFields = computed(() =>
 const filteredDocuments = computed(() => {
   const keyword = searchKeyword.value.trim().toLocaleLowerCase('zh-CN');
   const category = selectedCategory.value;
-  if (category === '全部' && !keyword && !authorFilter.value.trim()) return documents.value;
+  if (category === '全部' && !keyword && !selectedPerson.value) return documents.value;
 
   return documents.value.filter(
     (document, index) =>
       (category === '全部' || document.category === category) &&
-      author(document).toLocaleLowerCase().includes(authorFilter.value.trim().toLocaleLowerCase()) &&
+      (!selectedPerson.value || docPeople(document).includes(selectedPerson.value)) &&
       (!keyword ||
         hits.value[document.id] ||
         searchFields.value[index].some((field) => field.includes(keyword)))
@@ -445,11 +483,14 @@ const removeActiveBook = (): void => {
   });
 };
 
-const openDocument = async (document: HymnDocument): Promise<void> => {
-  if (!isElectron) return;
-  const error = await window.api.openHymnDocument(document.id);
-  if (error) message.error(error);
-};
+const scoreVisible=ref(false),scoreBusy=ref(false),scoreDoc=shallowRef<HymnDocument|null>(null);
+const scorePage=shallowRef<{number:number,total:number,image:string}|null>(null);
+let request=0;
+async function turnPage(delta:number){if(!scoreDoc.value)return;const token=++request;scoreBusy.value=true;
+try{const p=await window.api.invoke('poems:score-page',scoreDoc.value.id,(scorePage.value?.number||1)+delta);if(token===request)scorePage.value=p}
+catch(e){message.error(String(e))}finally{if(token===request)scoreBusy.value=false}}
+async function externalScore(){if(scoreDoc.value){const error=await window.api.openHymnDocument(scoreDoc.value.id);if(error)message.error(error)}}
+const openDocument=async(d:HymnDocument)=>{if(!isElectron)return;scoreDoc.value=d;if(d.source==='builtin'||d.category.startsWith('蓝版')){scorePage.value=null;scoreVisible.value=true;await turnPage(0)}else await externalScore()};
 
 const playDocument = async (document: HymnDocument): Promise<void> => {
   if (!document.hasAudio || playingId.value) return;
@@ -490,7 +531,7 @@ onMounted(async () => {
     return;
   }
   try {
-    await reloadLibrary();
+    await Promise.all([reloadLibrary(),local.loadFromCache()]);
   } catch (error) {
     console.error('加载诗歌谱失败:', error);
   } finally {
@@ -539,4 +580,5 @@ onMounted(async () => {
     display: none;
   }
 }
+.person-hero,.people-section{border-radius:24px;background:var(--poems-panel,rgba(128,140,150,.09));padding:22px;margin-bottom:18px}.person-hero{display:flex;align-items:center;gap:20px}.person-hero h2{font-size:32px;font-weight:700;margin:6px 0}.person-hero button,.people-list small,.local-result span{opacity:.72;font-size:13px}.person-avatar,.people-list button span{border-radius:32%;background:linear-gradient(135deg,#c4e4d7,#8baaa1);color:#183c34;display:grid;place-items:center}.person-avatar{width:78px;height:78px;font-size:36px}.people-section h2{font-weight:650;margin-bottom:12px}.people-list{display:flex;flex-wrap:wrap;gap:10px}.people-list button{display:grid;grid-template-columns:42px 1fr;column-gap:10px;padding:8px 12px;border-radius:15px;text-align:left;background:var(--poems-page,rgba(128,140,150,.1))}.people-list button span{width:42px;height:42px;grid-row:span 2}.local-result{display:flex;align-items:center;gap:12px;width:100%;padding:10px;text-align:left}.score-nav{display:flex;align-items:center;gap:14px;margin-bottom:12px}.clean-page{max-height:70vh;overflow:auto;text-align:center}.clean-page img{width:100%;display:block;border-radius:12px}
 </style>

@@ -1,6 +1,6 @@
 {
   "name": "love-hymn-player",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Poems桌面播放器",
   "author": "Poems",
   "repository": {"type":"git","url":"https://github.com/solomon-man/Poems.git"},
@@ -131,6 +131,7 @@
   "build": {
     "appId": "pri.prepare.lovehymn.desktop",
     "productName": "Poems",
+    "beforePack": "./scripts/before-pack.cjs",
     "extraResources": [
       {
         "from": "resources/html",
@@ -140,7 +141,7 @@
         ]
       },
       {
-        "from": "songbooks",
+        "from": "build/blue-scores",
         "to": "hymns",
         "filter": [
           "**/*.pdf"
@@ -246,7 +247,10 @@
       "LICENSE",
       "resources/icons/**/*",
       "resources/*.{png,ico,icns}",
-      "!out/renderer/transcription/**"
+      "!out/renderer/transcription/**",
+      "!out/renderer/**/*.gz",
+      "!node_modules/tesseract.js-core/*.wasm.js",
+      "!node_modules/tesseract.js/dist/**"
     ],
     "asarUnpack": [
       "node_modules/{tesseract.js,tesseract.js-core,regenerator-runtime,wasm-feature-detect,is-url,bmp-js}/**/*"

@@ -14,7 +14,7 @@ const { _electron } = require('playwright');
     page.setDefaultTimeout(20000);
     await page.waitForLoadState('domcontentloaded');
     await page.evaluate(() => (location.hash = '/hymn-library'));
-    await page.getByPlaceholder('搜歌词、歌名、编号或文件名').fill('爱随着光释放');
+    await page.getByPlaceholder('搜作者、歌手、歌名或歌词').fill('爱随着光释放');
     const open = () => page.getByTitle('写心迹').first().click();
     await open();
     const editor = page.getByRole('textbox', { name: '写下此刻的感悟' });
