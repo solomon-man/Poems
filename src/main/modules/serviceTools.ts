@@ -32,6 +32,25 @@ async function pack(root: string, rel: string, files: Record<string, string>) {
   }
 }
 export function registerServiceTools() {
+  ipcMain.handle('poems:diagnostics', async () => {
+    const root = app.isPackaged ? process.resourcesPath : app.getAppPath();
+    const assets = [
+      ['内置歌谱目录', app.isPackaged ? 'hymns' : 'songbooks'],
+      ['简体中文 OCR 字库', 'ocr-data/chi_sim.traineddata.gz'],
+      ['繁体中文 OCR 字库', 'ocr-data/chi_tra.traineddata.gz'],
+      ['英文 OCR 字库', 'ocr-data/eng.traineddata.gz'],
+      ['语音转写脚本', 'transcription/transcribe.py'],
+      ['本地 AI 引擎包', 'local-ai/llama-b12651-win-cpu.zip']
+    ];
+    const components = await Promise.all(assets.map(async ([name, file], index) => {
+      const prefix = app.isPackaged || index === 0 ? '' : file.startsWith('transcription/') ? 'resources' : 'build';
+      const stat = await fs.stat(join(root, prefix, file)).catch(() => null);
+      return { name, present: index === 0 ? !!stat?.isDirectory() : !!stat?.isFile() && stat.size > 0 };
+    }));
+    return { version: app.getVersion(), platform: process.platform, arch: process.arch,
+      electron: process.versions.electron, chromium: process.versions.chrome, node: process.versions.node,
+      packaged: app.isPackaged, checkedAt: new Date().toISOString(), components };
+  });
   let display: BrowserWindow | null = null;
   ipcMain.handle('poems:project', async (event, line: string | null) => {
     if (line === null) {
