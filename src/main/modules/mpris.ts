@@ -1,9 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import Player from 'mpris-service';
+import type Player from 'mpris-service';
 
 let dbusModule: any;
 try {
-  dbusModule = require('@httptoolkit/dbus-native');
+  if (process.platform === 'linux') dbusModule = require('@httptoolkit/dbus-native');
 } catch {
   // dbus-native 不可用（非 Linux 环境）
 }
@@ -47,7 +47,8 @@ export function initializeMpris(mainWindowRef: BrowserWindow) {
   mainWindow = mainWindowRef;
 
   try {
-    mprisPlayer = Player({
+    const createPlayer: typeof Player = require('mpris-service');
+    mprisPlayer = createPlayer({
       name: 'PoemsPlayer',
       identity: 'Poems',
       supportedUriSchemes: ['file', 'http', 'https'],

@@ -36,21 +36,4 @@ app.use(i18n as any);
 app.mount('#app');
 
 const startup = document.getElementById('hymn-startup');
-if (startup) {
-  const revealPlayer = () => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      startup.remove();
-      return;
-    }
-    const fade = startup.animate([{ opacity: 1 }, { opacity: 0 }], {
-      duration: 230,
-      easing: 'ease-out',
-      fill: 'forwards'
-    });
-    fade.onfinish = fade.oncancel = () => startup.remove();
-  };
-  // Warm launches can mount Vue before Electron presents the window's first frame.
-  void Promise.allSettled([router.isReady(), window.api.invoke('main-window:first-show')]).then(
-    revealPlayer
-  );
-}
+if (startup) void router.isReady().then(() => startup.remove());

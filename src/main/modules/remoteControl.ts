@@ -1,6 +1,6 @@
-import cors from 'cors';
+
 import { ipcMain } from 'electron';
-import express from 'express';
+import type express from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -107,11 +107,13 @@ function startServer(config: RemoteControlConfig) {
     return;
   }
 
-  app = express();
+  const expressServer: typeof express = require('express');
+  const cors: typeof import('cors') = require('cors');
+  app = expressServer();
 
   // 跨域配置
   app.use(cors());
-  app.use(express.json());
+  app.use(expressServer.json());
 
   // IP 过滤中间件
   app.use((req, res, next) => {

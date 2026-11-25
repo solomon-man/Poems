@@ -2,10 +2,10 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { app, BrowserWindow, ipcMain, nativeImage, Notification, shell } from 'electron';
 import Store from 'electron-store';
-import { fileTypeFromFile } from 'file-type';
-import { FlacTagMap, writeFlacTags } from 'flac-tagger';
+
+import type { FlacTagMap } from 'flac-tagger';
 import * as fs from 'fs';
-import * as mm from 'music-metadata';
+
 import * as NodeID3 from 'node-id3';
 import * as os from 'os';
 import * as path from 'path';
@@ -384,7 +384,7 @@ class DownloadManager {
       }
 
       if (ext === '.flac') {
-        const metadata = await mm.parseFile(filePath);
+        const metadata = await (await import('music-metadata')).parseFile(filePath);
         const native = metadata.native;
         // Look for LYRICS in vorbis comments
         for (const format of Object.keys(native)) {
@@ -619,11 +619,11 @@ class DownloadManager {
     // Detect file type
     let fileExtension = '';
     try {
-      const fileType = await fileTypeFromFile(task.tempFilePath);
+      const fileType = await (await import('file-type')).fileTypeFromFile(task.tempFilePath);
       if (fileType && fileType.ext) {
         fileExtension = `.${fileType.ext}`;
       } else {
-        const metadata = await mm.parseFile(task.tempFilePath);
+        const metadata = await (await import('music-metadata')).parseFile(task.tempFilePath);
         if (metadata && metadata.format) {
           const container = metadata.format.container || '';
           const codec = metadata.format.codec || '';
@@ -794,7 +794,7 @@ class DownloadManager {
           DATE: info?.publishTime ? new Date(info.publishTime).getFullYear().toString() : ''
         };
 
-        await writeFlacTags(
+        await (await import('flac-tagger')).writeFlacTags(
           {
             tagMap,
             picture: coverImageBuffer ? { buffer: coverImageBuffer, mime: 'image/jpeg' } : undefined

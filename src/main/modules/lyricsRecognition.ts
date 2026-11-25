@@ -9,7 +9,6 @@ import {
 import type { ApplyLyricsReviewRequest } from '../../shared/localAi';
 import type { LyricsRecognitionRequest, LyricsRecognitionResult } from '../../shared/hymnLibrary';
 import { transcribeAudioToLrc } from './audioTranscription';
-import { extractPdfLyrics } from './pdfLyrics';
 
 export const ocrModelDirectory = () =>
   app.isPackaged
@@ -54,7 +53,7 @@ async function recognize(
     saved = { source, path: filePath, size: before.size, mtimeMs: before.mtimeMs, lrc };
     result = { lrc, text: lrc.replace(/^\[\d+:\d+(?:[.:]\d+)?\]\s*/gm, ''), timing: 'recognized' };
   } else {
-    const lines = await extractPdfLyrics(filePath, {
+    const lines = await (await import('./pdfLyrics')).extractPdfLyrics(filePath, {
       title: song?.title,
       modelDirectory: ocrModelDirectory(),
       signal

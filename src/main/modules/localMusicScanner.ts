@@ -4,7 +4,7 @@
 import * as crypto from 'crypto';
 import { app, ipcMain } from 'electron';
 import * as fs from 'fs';
-import * as mm from 'music-metadata';
+import type * as mm from 'music-metadata';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -279,7 +279,7 @@ async function parseMetadata(filePath: string): Promise<LocalMusicMeta> {
   };
 
   try {
-    const metadata = await mm.parseFile(filePath);
+    const metadata = await (await import('music-metadata')).parseFile(filePath);
     const { common, format } = metadata;
 
     return {

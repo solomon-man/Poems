@@ -1,5 +1,5 @@
 <template>
-  <div class="h-full w-full bg-white text-neutral-900 dark:bg-black dark:text-white">
+  <div class="library h-full w-full bg-white text-neutral-900 dark:bg-black dark:text-white">
     <n-scrollbar class="h-full">
       <header class="border-b border-neutral-200 px-8 pb-5 pt-6 dark:border-neutral-800">
         <div class="flex flex-wrap items-end justify-between gap-5">
@@ -55,7 +55,7 @@
 
           <n-input
             v-model:value="searchKeyword"
-            class="max-w-md"
+            class="library-search max-w-md"
             clearable
             placeholder="搜作者、歌手、歌名或歌词"
           >
@@ -74,7 +74,7 @@
         </div>
       </header>
 
-      <div class="px-8 pb-32 pt-5">
+      <div class="library-body px-8 pb-32 pt-5">
         <section v-if="selectedPerson" class="person-hero">
           <div class="person-avatar">{{selectedPerson.slice(0,1)}}</div><div><button @click="selectedPerson='';browseAuthors=true">‹ 所有作者与歌手</button><h2>{{selectedPerson}}</h2><p>{{filteredDocuments.length+localResults.length}} 首作品</p></div>
         </section>
@@ -86,10 +86,11 @@
         <section v-if="localResults.length" class="people-section"><h2>本地歌曲</h2>
           <button class="local-result" v-for="track in localResults.slice(0,limit)" :key="track.id" @click="playLocal(track)"><i class="ri-play-circle-line"/><strong>{{track.title}}</strong><span>{{track.artist}} · {{track.album}}</span></button>
         </section>
-        <div v-if="!selectedPerson" class="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="诗歌分类">
+        <div v-if="!selectedPerson" class="category-strip mb-5 flex flex-wrap gap-2" role="group" aria-label="诗歌分类">
           <button
             v-for="category in categories"
             :key="category.name"
+            :aria-pressed="selectedCategory === category.name"
             class="category-tab"
             :class="{ active: selectedCategory === category.name }"
             type="button"
@@ -109,13 +110,13 @@
           提取歌词并生成滚动时间轴。
         </div>
 
-        <div class="overflow-hidden border-y border-neutral-200 dark:border-neutral-800">
+        <div class="song-table overflow-hidden border border-neutral-200 dark:border-neutral-800">
           <div
             class="document-grid bg-neutral-50 px-4 py-2 text-xs font-semibold text-neutral-500 dark:bg-neutral-900/70 dark:text-neutral-400"
           >
             <span>编号</span>
             <span>分类</span>
-            <span>文件</span>
+            <span>歌名</span>
             <span>音频</span>
             <span class="sr-only">操作</span>
           </div>
@@ -151,11 +152,10 @@
             <span class="font-semibold tabular-nums">{{ document.number }}</span>
             <span class="text-neutral-600 dark:text-neutral-300">{{ document.category }}</span>
             <button
-              class="min-w-0 truncate text-left text-sm text-neutral-400"
+              class="song-title min-w-0 truncate text-left text-sm"
               @click="openDocument(document)"
             >
-              <small v-if="author(document)" class="block">{{author(document)}}</small>{{ songTitle(document)
-              }}<small v-if="hits[document.id]" class="block truncate text-primary">{{
+              {{ songTitle(document) }}<small v-if="author(document)" class="block truncate">{{author(document)}}</small><small v-if="hits[document.id]" class="block truncate text-primary">{{
                 hits[document.id]
               }}</small>
             </button>
@@ -215,9 +215,11 @@
       <div class="mt-4 flex justify-end gap-2"><n-button @click="preview=null">取消</n-button><n-button type="primary" :disabled="!edition" :loading="importBusy" @click="confirmScore">确认导入</n-button></div></template>
     </n-modal>
     <piano-book ref="piano" :documents="documents" :lyrics="lyrics" :scores="scores" @change="saveScore" />
-    <n-modal v-model:show="scoreVisible" preset="card" :title="scoreDoc?songTitle(scoreDoc):'蓝版歌谱'" style="width:min(1080px,95vw)">
-      <div class="score-nav"><n-button :disabled="scoreBusy || !scorePage || scorePage.number<=1" @click="turnPage(-1)">上一页</n-button><span>{{scorePage?.number||1}} / {{scorePage?.total||'…'}}</span><n-button :disabled="scoreBusy || !scorePage || scorePage.number>=scorePage.total" @click="turnPage(1)">下一页</n-button><n-button text @click="externalScore">用系统打开 PDF</n-button></div>
+    <n-modal v-model:show="scoreVisible" :close-on-esc="false" @esc="escapeScore" preset="card" :title="scoreDoc?songTitle(scoreDoc):'蓝版歌谱'" style="width:min(1080px,95vw)">
+      <section ref="scoreViewer" class="score-viewer" @fullscreenchange="syncPresentation" @keydown.capture="presentationKey">
+      <div class="score-nav"><n-button :disabled="scoreBusy || !scorePage || scorePage.number<=1" @click="turnPage(-1)">上一页</n-button><span>{{scorePage?.number||1}} / {{scorePage?.total||'…'}}</span><n-button :disabled="scoreBusy || !scorePage || scorePage.number>=scorePage.total" @click="turnPage(1)">下一页</n-button><n-button v-if="!presenting" text @click="externalScore">用系统打开 PDF</n-button><n-button @click="togglePresentation">{{ presenting ? '退出全屏 (Esc)' : '全屏展示' }}</n-button></div>
       <div class="clean-page"><n-spin v-if="scoreBusy"/><img v-else-if="scorePage" :src="scorePage.image" alt="蓝版歌谱"/></div>
+      </section>
     </n-modal>
     <song-journal ref="journal" />
     <service-workshop
@@ -485,6 +487,58 @@ const removeActiveBook = (): void => {
 
 const scoreVisible=ref(false),scoreBusy=ref(false),scoreDoc=shallowRef<HymnDocument|null>(null);
 const scorePage=shallowRef<{number:number,total:number,image:string}|null>(null);
+const scoreViewer = ref<HTMLElement | null>(null);
+const presenting = ref(false);
+
+let fullscreenExitAt = -Infinity;
+function escapeScore() {
+  if (!presenting.value && !document.fullscreenElement && performance.now() - fullscreenExitAt > 400) {
+    scoreVisible.value = false;
+  }
+}
+
+function syncPresentation() {
+  if (presenting.value && !document.fullscreenElement) fullscreenExitAt = performance.now();
+  presenting.value = !!scoreViewer.value && document.fullscreenElement === scoreViewer.value;
+}
+
+async function togglePresentation() {
+  try {
+    if (document.fullscreenElement === scoreViewer.value && scoreViewer.value) {
+      await document.exitFullscreen();
+    } else {
+      await scoreViewer.value?.requestFullscreen();
+    }
+  } catch {
+    message.error('无法切换全屏展示，请重试');
+  }
+}
+
+watch(scoreVisible, (visible, _, onCleanup) => {
+  if (!visible) return;
+  const flipPage = (event: KeyboardEvent) => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const page = scorePage.value;
+    if (scoreBusy.value || !page || page.number + step < 1 || page.number + step > page.total) return;
+    void turnPage(step);
+  };
+  window.addEventListener('keydown', flipPage, true);
+  onCleanup(() => window.removeEventListener('keydown', flipPage, true));
+});
+
+function presentationKey(event: KeyboardEvent) {
+  if (!presenting.value) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    void togglePresentation();
+  }
+}
+
 let request=0;
 async function turnPage(delta:number){if(!scoreDoc.value)return;const token=++request;scoreBusy.value=true;
 try{const p=await window.api.invoke('poems:score-page',scoreDoc.value.id,(scorePage.value?.number||1)+delta);if(token===request)scorePage.value=p}
@@ -543,7 +597,7 @@ onMounted(async () => {
 <style scoped>
 .category-tab {
   @apply flex h-9 items-center gap-2 border border-neutral-200 bg-white px-3 text-sm text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900 dark:border-neutral-800 dark:bg-black dark:text-neutral-300 dark:hover:border-neutral-700 dark:hover:text-white;
-  border-radius: 6px;
+  border-radius: 999px;
 }
 
 .category-tab.active {
@@ -560,7 +614,7 @@ onMounted(async () => {
 
 .document-grid {
   display: grid;
-  grid-template-columns: 90px 130px minmax(180px, 1fr) minmax(160px, 0.8fr) 222px;
+  grid-template-columns: 64px minmax(72px, .52fr) minmax(130px, 1.5fr) minmax(92px, .78fr) 222px;
   align-items: center;
   gap: 16px;
 }
@@ -581,4 +635,54 @@ onMounted(async () => {
   }
 }
 .person-hero,.people-section{border-radius:24px;background:var(--poems-panel,rgba(128,140,150,.09));padding:22px;margin-bottom:18px}.person-hero{display:flex;align-items:center;gap:20px}.person-hero h2{font-size:32px;font-weight:700;margin:6px 0}.person-hero button,.people-list small,.local-result span{opacity:.72;font-size:13px}.person-avatar,.people-list button span{border-radius:32%;background:linear-gradient(135deg,#c4e4d7,#8baaa1);color:#183c34;display:grid;place-items:center}.person-avatar{width:78px;height:78px;font-size:36px}.people-section h2{font-weight:650;margin-bottom:12px}.people-list{display:flex;flex-wrap:wrap;gap:10px}.people-list button{display:grid;grid-template-columns:42px 1fr;column-gap:10px;padding:8px 12px;border-radius:15px;text-align:left;background:var(--poems-page,rgba(128,140,150,.1))}.people-list button span{width:42px;height:42px;grid-row:span 2}.local-result{display:flex;align-items:center;gap:12px;width:100%;padding:10px;text-align:left}.score-nav{display:flex;align-items:center;gap:14px;margin-bottom:12px}.clean-page{max-height:70vh;overflow:auto;text-align:center}.clean-page img{width:100%;display:block;border-radius:12px}
+
+.library {
+  container-type: inline-size;
+  --library-line: color-mix(in srgb, currentColor 13%, transparent);
+  --library-fill: color-mix(in srgb, currentColor 5%, transparent);
+}
+.library header, .library-body {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4cqw, 56px);
+}
+.library header { padding-top: clamp(24px, 4cqw, 48px); }
+.library h1 { font-size: clamp(28px, 4cqw, 40px); line-height: 1.15; letter-spacing: -.035em; }
+.library-search { --n-border-radius: 12px !important; min-height: 38px; align-items: center; }
+.song-table { border-radius: 18px; border-color: var(--library-line); }
+.song-title { font-weight: 600; line-height: 1.5; }
+.song-title small { font-weight: 400; opacity: .75; }
+.library button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.people-list button:hover, .local-result:hover { background: var(--library-fill); }
+.score-nav { flex-wrap: wrap; justify-content: center; font-variant-numeric: tabular-nums; }
+@container (max-width: 790px) {
+  .document-grid { grid-template-columns: 46px minmax(0, 1fr) auto; gap: 8px; }
+  .document-grid > :nth-child(2), .document-grid > :nth-child(4) { display: none; }
+}
+@container (max-width: 540px) {
+  .document-row > :last-child { grid-column: 2 / -1; justify-content: flex-start; flex-wrap: wrap; }
+  .category-strip { flex-wrap: nowrap; overflow-x: auto; padding-block: 3px; }
+  .category-tab { flex-shrink: 0; }
+}
+.score-viewer:fullscreen {
+  display: flex;
+  flex-direction: column;
+  background: #111318;
+  color: white;
+}
+.score-viewer:fullscreen .score-nav {
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--n-color, Canvas);
+  color: var(--n-text-color, CanvasText);
+}
+.score-viewer:fullscreen .clean-page {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.score-viewer:fullscreen img { height: 100%; min-height: 0; object-fit: contain; border-radius: 0; }
 </style>

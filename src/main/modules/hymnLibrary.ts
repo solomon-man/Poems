@@ -3,11 +3,10 @@ import { loadRecognition, storeRecognition } from './recognizedLyrics';
 import { createHash, randomUUID } from 'crypto';
 import { app, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'fs';
-import * as mm from 'music-metadata';
+
 import { basename, extname, isAbsolute, join, relative, resolve, sep } from 'path';
 import { initializeLyricsRecognition, ocrModelDirectory } from './lyricsRecognition';
 import { buildTimedLyrics, readRecognizedLyrics } from './recognizedLyrics';
-import { extractPdfLyrics, readScorePages, renderScorePage } from './pdfLyrics';
 
 import type {
   CustomHymnBook,
@@ -223,7 +222,7 @@ const getOrCreateLyrics = async (
   try {
     return await fs.readFile(cachePath, 'utf8');
   } catch {
-    const lines = await extractPdfLyrics(document.filePath, {
+    const lines = await (await import('./pdfLyrics')).extractPdfLyrics(document.filePath, {
       title: document.title,
       modelDirectory: ocrModelDirectory(),
       ocr: false
@@ -244,20 +243,20 @@ export function initializeHymnLibrary(): void {
     if(id.startsWith('builtin:')){
       const root=getBuiltinRoot(), path=join(root,id.slice(8));
       if(!isInsideRoot(root,path)||extname(path).toLowerCase()!=='.pdf')throw Error('无效歌谱');
-      return renderScorePage(path,page);
+      return (await import('./pdfLyrics')).renderScorePage(path,page);
     }
     const doc=manifest.documents.find(d=>d.id===id);
     if(!doc)throw Error('歌谱不存在');
     const path=join(getCustomRoot(),doc.bookId,doc.fileName);
     if(!isInsideRoot(getCustomRoot(),path))throw Error('无效歌谱');
-    return renderScorePage(path,page);
+    return (await import('./pdfLyrics')).renderScorePage(path,page);
   });
   let pendingScore:{path:string,token:string}|undefined;
   ipcMain.handle('poems:score-read',async ()=>{
     const choice=await dialog.showOpenDialog({properties:['openFile'],filters:[{name:'PDF 歌谱',extensions:['pdf']}]});
     if(choice.canceled)return null;
     const path=choice.filePaths[0], token=randomUUID();
-    const result=await readScorePages(path,ocrModelDirectory());
+    const result=await (await import('./pdfLyrics')).readScorePages(path,ocrModelDirectory());
     pendingScore={path,token};
     return {...result,token,name:basename(path)};
   });
@@ -294,7 +293,7 @@ export function initializeHymnLibrary(): void {
           if (customText.get(doc.id)?.stamp !== stamp)
             customText.set(doc.id, {
               stamp,
-              lines: await extractPdfLyrics(doc.filePath, {
+              lines: await (await import('./pdfLyrics')).extractPdfLyrics(doc.filePath, {
                 title: doc.title,
                 modelDirectory: ocrModelDirectory(),
                 ocr: false
@@ -519,7 +518,7 @@ export function initializeHymnLibrary(): void {
           continue;
         }
         try {
-          const metadata = await mm.parseFile(filePath, { skipCovers: true });
+          const metadata = await (await import('music-metadata')).parseFile(filePath, { skipCovers: true });
           manifest.audioLinks[documentId] = {
             path: filePath,
             duration: Math.round((metadata.format.duration ?? 0) * 1000),

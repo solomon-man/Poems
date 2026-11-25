@@ -1,6 +1,6 @@
 {
   "name": "love-hymn-player",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Poems桌面播放器",
   "author": "Poems",
   "repository": {"type":"git","url":"https://github.com/solomon-man/Poems.git"},
@@ -42,7 +42,6 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "@httptoolkit/dbus-native": "^0.1.5",
-    "@unblockneteasemusic/server": "^0.27.10",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "electron-store": "^8.2.0",
@@ -57,7 +56,6 @@
     "jsencrypt": "^3.5.4",
     "mpris-service": "^2.1.2",
     "music-metadata": "^11.10.3",
-    "netease-cloud-music-api-alger": "^4.30.0",
     "node-fetch": "^2.7.0",
     "node-id3": "^0.2.9",
     "node-machine-id": "^1.1.12",
@@ -67,6 +65,8 @@
     "vue-i18n": "^11.2.2"
   },
   "devDependencies": {
+    "netease-cloud-music-api-alger": "^4.30.0",
+    "@unblockneteasemusic/server": "^0.27.10",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@electron-toolkit/eslint-config": "^2.1.0",
@@ -131,6 +131,7 @@
   "build": {
     "appId": "pri.prepare.lovehymn.desktop",
     "productName": "Poems",
+    "compression": "maximum",
     "beforePack": "./scripts/before-pack.cjs",
     "extraResources": [
       {
@@ -186,6 +187,7 @@
       ]
     },
     "win": {
+      "electronLanguages": ["zh-CN", "zh-TW", "en-US", "ja", "ko"],
       "extraResources": [{ "from": "build/local-ai", "to": "local-ai" }],
       "icon": "resources/icon.ico",
       "target": [
@@ -250,7 +252,11 @@
       "!out/renderer/transcription/**",
       "!out/renderer/**/*.gz",
       "!node_modules/tesseract.js-core/*.wasm.js",
-      "!node_modules/tesseract.js/dist/**"
+      "!node_modules/tesseract.js/dist/**",
+      "!node_modules/pdfjs-dist/**/*.map",
+      "!node_modules/pdfjs-dist/{build,web,types}/**",
+      "!node_modules/pdfjs-dist/legacy/web/**",
+      "!node_modules/pdfjs-dist/legacy/build/*.min.mjs"
     ],
     "asarUnpack": [
       "node_modules/{tesseract.js,tesseract.js-core,regenerator-runtime,wasm-feature-detect,is-url,bmp-js}/**/*"

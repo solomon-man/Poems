@@ -2,13 +2,16 @@
 
 ## 下载 Windows 版
 
-**[⬇ 下载 Windows x64 安装包（Poems 0.8.0）](https://github.com/solomon-man/Poems/releases/download/v0.8.0/Poems-0.8.0-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
+**[⬇ 下载 Windows x64 安装包（Poems 0.8.1）](https://github.com/solomon-man/Poems/releases/download/v0.8.1/Poems-0.8.1-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
 
-双击安装程序，选择安装目录，完成后从桌面打开 Poems。0.8.0 的 Windows x64 安装包为 259,865,089 字节，比 0.7.0 缩小 35.3%；解包后的程序文件合计减少 23.8%。
+双击安装程序，选择安装目录，完成后从桌面打开 Poems。Windows x64 安装包为 238,507,520 字节，比 0.8.0 缩小 8.2%。解包后的程序文件合计为 535,327,481 字节，缩小 15.4%。
 
 Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、歌谱检索、歌词识别和本地 AI。首次使用可先在本地音乐页选择歌曲文件夹。
 
-## 0.8.0 使用指南
+## 0.8.1 使用指南
+
+- **全屏读谱**：打开蓝版歌谱，点击「全屏展示」。在预览或全屏中按 ↑ / ↓ 翻页，按 Esc 回到当前页。
+- **启动提速**：PDF 和音频元数据解析按需加载。从托盘唤回时可直接显示已打开的播放器。
 
 - **只记得一句歌词**：打开「诗歌本」，直接输入歌词。搜索同时匹配歌名、编号和歌词，结果显示匹配的原句。点击文件打开 PDF，点击「编排」可从匹配行试听已关联的音频。内置 1914 份歌谱中，1912 份含可提取行。扫描件请先执行「识别歌词 → PDF」，保存的识别和校对结果优先参与搜索。
 - **修复桌面入口**：重新运行 Windows 安装程序即可重建 Poems 快捷方式，指向本次安装目录。建议使用本机默认目录。
@@ -130,7 +133,7 @@ npm run build:win
 主要输出：
 
 ```text
-dist/Poems-0.8.0-win-x64.exe
+dist/Poems-0.8.1-win-x64.exe
 dist/win-unpacked/Poems.exe
 ```
 

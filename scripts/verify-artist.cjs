@@ -58,7 +58,17 @@ const os = require('node:os');
     await page.locator('.document-row').filter({has:page.getByText('044',{exact:true})}).first().getByTitle('打开 PDF').click();
     const img = page.locator('.clean-page img');
     await img.waitFor();
-    await page.getByText('下一页', { exact: true }).click();
+    await page.keyboard.press('ArrowDown');
+    await page.getByText('2 / 4', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '全屏展示' }).click();
+    await page.waitForFunction(() => document.fullscreenElement?.classList.contains('score-viewer'));
+    await page.keyboard.press('ArrowDown');
+    await page.getByText('3 / 4', { exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.fullscreenElement);
+    await page.getByText('3 / 4', { exact: true }).waitFor();
+    await img.waitFor();
+    await page.keyboard.press('ArrowUp');
     await page.getByText('2 / 4', { exact: true }).waitFor();
     assert.ok((await img.evaluate((el) => el.naturalWidth)) > 1000);
     console.log(
