@@ -44,7 +44,7 @@ export function registerServiceTools() {
       ['繁体中文 OCR 字库', 'ocr-data/chi_tra.traineddata.gz'],
       ['英文 OCR 字库', 'ocr-data/eng.traineddata.gz'],
       ['语音转写脚本', 'transcription/transcribe.py'],
-      ['本地 AI 引擎包', 'local-ai/llama-b12651-win-cpu.zip']
+      ['本地 AI 引擎包', 'local-ai/llama-server-b12651-win-cpu.tar.xz']
     ];
     const components = await Promise.all(assets.map(async ([name, file], index) => {
       const prefix = app.isPackaged || index === 0 ? '' : file.startsWith('transcription/') ? 'resources' : 'build';

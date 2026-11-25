@@ -26,6 +26,19 @@ export default defineConfig({
     plugins: [
       vue(),
       VueDevTools(),
+      {
+        name: 'desktop-icon-font',
+        enforce: 'pre',
+        transform(css, id) {
+          if (!id.endsWith('/remixicon/fonts/remixicon.css')) return;
+          // Electron needs only WOFF2. Keep the upstream glyph map intact.
+          return css.replace(/@font-face\s*\{[^}]*\}/, `@font-face {
+            font-family: "remixicon";
+            src: url("./remixicon.woff2") format("woff2");
+            font-display: swap;
+          }`);
+        }
+      },
       AutoImport({
         imports: [
           'vue',

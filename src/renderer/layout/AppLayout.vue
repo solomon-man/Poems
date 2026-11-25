@@ -171,6 +171,31 @@ provide('openPlaylistDrawer', openPlaylistDrawer);
   @apply h-full;
 }
 
+.layout-page:not(.mobile) {
+  --edge: color-mix(in srgb, var(--poems-text, currentColor) 12%, transparent);
+
+  .layout-main {
+    display: flex;
+    flex-direction: column;
+    background: var(--poems-panel, inherit);
+  }
+
+  .layout-main-page {
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px 0;
+  }
+
+  .main {
+    min-width: 0;
+    border: 1px solid var(--edge);
+    border-radius: 18px;
+    background: var(--poems-page, Canvas);
+  }
+
+  .menu { background: transparent; }
+}
+
 .mobile {
   .main-content {
     height: calc(100vh - 130px);

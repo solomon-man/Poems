@@ -1,3 +1,4 @@
+import { release } from 'node:os';
 import { is } from '@electron-toolkit/utils';
 import {
   app,
@@ -318,7 +319,8 @@ export function createMainWindow(icon: Electron.NativeImage): BrowserWindow {
 
   // 创建窗口
   const mainWindow = new BrowserWindow(options);
-  if(process.platform==='win32'){
+  // Windows 11 composites the native corners and their shadow at display resolution.
+  if (process.platform === 'win32' && Number(release().split('.')[2]) < 22000) {
     const roundWindow=()=>{
       if(mainWindow.isDestroyed())return;
       if(mainWindow.isMaximized()||mainWindow.isFullScreen()){mainWindow.setShape([]);return}

@@ -2,13 +2,15 @@
 
 ## 下载 Windows 版
 
-**[⬇ 下载 Windows x64 安装包（Poems 0.8.1）](https://github.com/solomon-man/Poems/releases/download/v0.8.1/Poems-0.8.1-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
+**[⬇ 下载 Windows x64 安装包（Poems 0.8.2）](https://github.com/solomon-man/Poems/releases/download/v0.8.2/Poems-0.8.2-win-x64.exe)** · [全部发行版](https://github.com/solomon-man/Poems/releases)
 
-双击安装程序，选择安装目录，完成后从桌面打开 Poems。Windows x64 安装包为 238,507,520 字节，比 0.8.0 缩小 8.2%。解包后的程序文件合计为 535,327,481 字节，缩小 15.4%。
+双击安装程序，选择安装目录，完成后从桌面打开 Poems。Windows x64 安装包为 222,355,535 字节，比 0.8.1 缩小 6.8%。解包后的程序文件合计为 515,735,035 字节，比上一版缩小 3.7%。
 
 Poems 基于 AlgerMusicPlayer、Electron 和 Vue 3，支持本地音乐播放、歌谱检索、歌词识别和本地 AI。首次使用可先在本地音乐页选择歌曲文件夹。
 
-## 0.8.1 使用指南
+## 0.8.2 使用指南
+
+新版调整了 Windows 11 的窗口圆角、侧栏选中项和播放栏边线。「设置」标题、导航标签及正文使用同一左边距。桌面版统一使用 WOFF2 图标字体。本地 AI 引擎包保留 llama-server、运行库及各 CPU 后端，省去基准测试和模型转换工具。
 
 - **全屏读谱**：打开蓝版歌谱，点击「全屏展示」。在预览或全屏中按 ↑ / ↓ 翻页，按 Esc 回到当前页。
 - **启动提速**：PDF 和音频元数据解析按需加载。从托盘唤回时可直接显示已打开的播放器。
@@ -133,7 +135,7 @@ npm run build:win
 主要输出：
 
 ```text
-dist/Poems-0.8.1-win-x64.exe
+dist/Poems-0.8.2-win-x64.exe
 dist/win-unpacked/Poems.exe
 ```
 

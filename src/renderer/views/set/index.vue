@@ -2,21 +2,21 @@
   <div class="h-full w-full bg-white dark:bg-black transition-colors duration-500 flex flex-col">
     <!-- 顶部导航区 -->
     <div
-      class="flex-shrink-0 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-black z-10 page-padding pt-6 pb-2"
+      class="flex-shrink-0 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-black z-10 settings-inset pt-6 pb-2"
     >
-      <h1 class="text-2xl md:text-3xl font-bold text-neutral-900 dark:text-white mb-6">
+      <h1 class="text-2xl font-semibold leading-tight text-neutral-900 dark:text-white mb-4">
         {{ t('common.settings') }}
       </h1>
 
       <n-scrollbar x-scrollable class="w-full">
-        <div class="flex items-center pl-2 pb-2 whitespace-nowrap">
+        <div class="flex items-center pb-2 whitespace-nowrap">
           <div
             v-for="section in navSections"
             :key="section.id"
             class="py-1.5 px-4 mr-3 inline-block rounded-full cursor-pointer transition-all duration-300 text-sm font-medium select-none"
             :class="
               currentSection === section.id
-                ? 'bg-primary text-white shadow-lg shadow-primary/25 scale-105'
+                ? 'bg-primary text-white shadow-sm'
                 : 'bg-gray-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-800 hover:text-neutral-900 dark:hover:text-white'
             "
             @click="currentSection = section.id"
@@ -29,7 +29,7 @@
 
     <!-- 内容区域 -->
     <n-scrollbar class="flex-1">
-      <div class="w-full mx-auto pb-32 pt-6 page-padding">
+      <div class="w-full mx-auto pb-32 pt-6 settings-inset">
         <div v-show="currentSection === 'basic'" class="animate-fade-in">
           <basic-tab />
         </div>
@@ -175,6 +175,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.settings-inset {
+  padding-inline: clamp(16px, 3vw, 36px);
+}
+
 :deep(.n-select .n-base-selection) {
   border-radius: 10px;
 }

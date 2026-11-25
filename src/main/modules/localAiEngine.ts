@@ -13,6 +13,12 @@ const execute = promisify(execFile);
 type Progress = (stage: string) => void;
 type Asset = { name: string; bytes: number; sha256: string; urls: string[] };
 
+// Server, CPU backends and runtime libraries from the pinned upstream archive.
+const bundledRuntime = {
+  name: 'llama-server-b12651-win-cpu.tar.xz',
+  sha256: 'a97d60ea74cc639608696560570c862c4906a1b0e9533ff1c9817a637f7ebbfc'
+};
+
 const runtime: Asset = {
   name: 'llama-b12651-win-cpu.zip',
   bytes: 25096571,
@@ -220,12 +226,12 @@ async function runtimeExecutable(signal: AbortSignal, progress: Progress): Promi
   )
     return exe;
   const bundled = app.isPackaged
-    ? join(process.resourcesPath, 'local-ai', runtime.name)
-    : join(__dirname, '..', '..', 'build', 'local-ai', runtime.name);
+    ? join(process.resourcesPath, 'local-ai', bundledRuntime.name)
+    : join(__dirname, '..', '..', 'build', 'local-ai', bundledRuntime.name);
   let archive = bundled;
   if ((await fs.stat(bundled).catch(() => null))?.isFile()) {
     progress('正在校验内置推理引擎');
-    if ((await fileHash(bundled, signal)) !== runtime.sha256)
+    if ((await fileHash(bundled, signal)) !== bundledRuntime.sha256)
       throw new Error('内置推理引擎校验失败，请重新安装播放器');
   } else {
     archive = await prepareAsset(runtime, '正在下载本地推理引擎', signal, progress);

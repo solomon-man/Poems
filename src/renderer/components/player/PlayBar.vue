@@ -335,7 +335,9 @@ const openPlayListDrawer = () => {
 
 .music-play-bar {
   @apply h-20 w-full absolute bottom-0 left-0 flex items-center box-border px-6 py-2 pt-3;
-  @apply bg-light dark:bg-dark shadow-2xl shadow-gray-300;
+  @apply bg-light dark:bg-dark;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: 0 -3px 14px rgb(0 0 0 / 5%);
   z-index: 9999;
   animation-duration: 0.5s !important;
 

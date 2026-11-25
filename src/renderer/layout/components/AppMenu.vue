@@ -143,7 +143,7 @@ const toggleMenu = () => {
   @apply w-[160px];
 
   .app-menu-item {
-    @apply hover:bg-gray-100 dark:hover:bg-gray-800 rounded mr-4;
+    @apply mx-0;
   }
 }
 
@@ -166,6 +166,23 @@ const toggleMenu = () => {
   &:hover {
     @apply text-green-500 scale-105 !important;
   }
+}
+
+.layout-page:not(.mobile) .app-menu-item-link {
+  box-sizing: border-box;
+  width: calc(100% - 12px);
+  min-height: 40px;
+  margin: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+}
+
+.layout-page:not(.mobile) .app-menu:not(.app-menu-expanded) .app-menu-item-link {
+  justify-content: center;
+}
+
+.layout-page:not(.mobile) .app-menu-item-link:is(:hover, .router-link-exact-active) {
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
 .mobile {
